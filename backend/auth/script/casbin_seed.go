@@ -52,8 +52,9 @@ func casbinPolicySeeds() []casbinRuleSeed {
 
 func casbinGroupingSeeds() []casbinRuleSeed {
 	return []casbinRuleSeed{
-		{Ptype: "g", V0: "admin1234@gmail.com", V1: constants.ENUM_ROLE_ADMIN},
-		{Ptype: "g", V0: "user1234@gmail.com", V1: constants.ENUM_ROLE_CUSTOMER},
+		{Ptype: "g", V0: "adm.adics@gmail.com", V1: constants.ENUM_ROLE_ADMIN},
+		{Ptype: "g", V0: "cst.adics@gmail.com", V1: constants.ENUM_ROLE_CUSTOMER},
+		{Ptype: "g", V0: "drv.adics@gmail.com", V1: constants.ENUM_ROLE_DRIVER},
 	}
 }
 

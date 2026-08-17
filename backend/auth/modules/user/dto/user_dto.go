@@ -51,11 +51,28 @@ type (
 	}
 
 	UserResponse struct {
-		ID        string    `json:"id"`
-		Email     string    `json:"email"`
-		Role      string    `json:"role,omitempty"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
+		ID        string                   `json:"id"`
+		Email     string                   `json:"email"`
+		Role      string                   `json:"role,omitempty"`
+		Customer  *CustomerProfileResponse `json:"customer,omitempty"`
+		Driver    *DriverProfileResponse   `json:"driver,omitempty"`
+		CreatedAt time.Time                `json:"created_at"`
+		UpdatedAt time.Time                `json:"updated_at"`
+	}
+
+	CustomerProfileResponse struct {
+		ID                string  `json:"id"`
+		Name              string  `json:"name"`
+		PhoneNumber       string  `json:"phone_number"`
+		ProfilePictureUrl *string `json:"profile_picture_url,omitempty"`
+	}
+
+	DriverProfileResponse struct {
+		ID                string  `json:"id"`
+		Name              string  `json:"name"`
+		PhoneNumber       string  `json:"phone_number"`
+		Address           string  `json:"address"`
+		ProfilePictureUrl *string `json:"profile_picture_url,omitempty"`
 	}
 
 	UserUpdateRequest struct {

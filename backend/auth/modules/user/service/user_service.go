@@ -35,12 +35,33 @@ func (s *userService) GetUserById(ctx context.Context, userId string) (dto.UserR
 		return dto.UserResponse{}, err
 	}
 
-	return dto.UserResponse{
+	resp := dto.UserResponse{
 		ID:        user.ID.String(),
 		Email:     user.Email,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
-	}, nil
+	}
+
+	if user.Customer != nil {
+		resp.Customer = &dto.CustomerProfileResponse{
+			ID:                user.Customer.ID.String(),
+			Name:              user.Customer.Name,
+			PhoneNumber:       user.Customer.PhoneNumber,
+			ProfilePictureUrl: user.Customer.ProfilePictureUrl,
+		}
+	}
+
+	if user.Driver != nil {
+		resp.Driver = &dto.DriverProfileResponse{
+			ID:                user.Driver.ID.String(),
+			Name:              user.Driver.Name,
+			PhoneNumber:       user.Driver.PhoneNumber,
+			Address:           user.Driver.Address,
+			ProfilePictureUrl: user.Driver.ProfilePictureUrl,
+		}
+	}
+
+	return resp, nil
 }
 
 func (s *userService) Update(ctx context.Context, req dto.UserUpdateRequest, userId string) (dto.UserUpdateResponse, error) {

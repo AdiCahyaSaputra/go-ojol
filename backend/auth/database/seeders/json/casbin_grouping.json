@@ -1,12 +1,17 @@
 [
   {
     "ptype": "g",
-    "v0": "admin1234@gmail.com",
+    "v0": "adm.adics@gmail.com",
     "v1": "admin"
   },
   {
     "ptype": "g",
-    "v0": "user1234@gmail.com",
+    "v0": "cst.adics@gmail.com",
     "v1": "customer"
+  },
+  {
+    "ptype": "g",
+    "v0": "drv.adics@gmail.com",
+    "v1": "driver"
   }
 ]

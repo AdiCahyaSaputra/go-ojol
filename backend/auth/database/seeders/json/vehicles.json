@@ -1,0 +1,23 @@
+[
+  {
+    "id": "fd1dae62-002f-4a1b-9c5b-ea74f54b7168",
+    "name": "Honda Beat",
+    "license_number": "B 1001 ADC",
+    "max_size": 1,
+    "type": "motorcycle"
+  },
+  {
+    "id": "a5780b41-84f7-44ca-8bf2-69eb46ebc59b",
+    "name": "Yamaha NMAX",
+    "license_number": "B 1002 ADC",
+    "max_size": 1,
+    "type": "motorcycle"
+  },
+  {
+    "id": "5bd64683-675b-4de7-ade3-e380e129c820",
+    "name": "Toyota Avanza",
+    "license_number": "B 2001 ADC",
+    "max_size": 4,
+    "type": "car"
+  }
+]

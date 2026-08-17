@@ -1,18 +1,24 @@
 [
   {
-    "name": "admin",
-    "telp_number": "08123456789",
-    "email": "admin1234@gmail.com",
-    "password": "admin1234",
+    "email": "adm.adics@gmail.com",
+    "password": "hehe1234",
     "role": "admin",
-    "is_verified": true
+    "name": "Adm. AdiCS"
   },
   {
-    "name": "user",
-    "telp_number": "08123456789",
-    "email": "user1234@gmail.com",
-    "password": "user1234",
+    "email": "cst.adics@gmail.com",
+    "password": "hehe1234",
     "role": "customer",
-    "is_verified": true
+    "name": "Cst. AdiCS",
+    "phone_number": "081234567801"
+  },
+  {
+    "email": "drv.adics@gmail.com",
+    "password": "hehe1234",
+    "role": "driver",
+    "name": "Drv. AdiCS",
+    "phone_number": "081234567802",
+    "address": "Jl. Melawai Raya No. 12, Kebayoran Baru, Jakarta Selatan",
+    "vehicle_id": "fd1dae62-002f-4a1b-9c5b-ea74f54b7168"
   }
 ]

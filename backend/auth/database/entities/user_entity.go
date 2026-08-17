@@ -11,6 +11,9 @@ type User struct {
 	Email    string    `gorm:"type:varchar(150);uniqueIndex;not null" json:"email"`
 	Password string    `gorm:"type:varchar(255);not null" json:"password"`
 
+	Customer *Customer `gorm:"foreignKey:UserID;references:ID" json:"customer,omitempty"`
+	Driver   *Driver   `gorm:"foreignKey:UserID;references:ID" json:"driver,omitempty"`
+
 	Timestamp
 }
 

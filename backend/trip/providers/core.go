@@ -1,13 +1,13 @@
 package providers
 
 import (
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/config"
-	authController "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/controller"
-	authService "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/service"
-	userController "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/controller"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/repository"
-	userService "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/service"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/constants"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/config"
+	authController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/auth/controller"
+	authService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/auth/service"
+	userController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/user/controller"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/user/repository"
+	userService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/user/service"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/samber/do"
 	"gorm.io/gorm"
 )
@@ -22,7 +22,7 @@ func RegisterDependencies(injector *do.Injector) {
 	InitDatabase(injector)
 
 	do.ProvideNamed(injector, constants.JWTService, func(i *do.Injector) (authService.JWTService, error) {
-		return authService.NewJWTService()
+		return authService.NewJWTService(), nil
 	})
 
 	db := do.MustInvokeNamed[*gorm.DB](injector, constants.DB)

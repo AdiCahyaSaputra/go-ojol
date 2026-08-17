@@ -3,11 +3,11 @@ package service
 import (
 	"context"
 
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/database/entities"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/dto"
-	userDto "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/dto"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/repository"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/helpers"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/database/entities"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/auth/dto"
+	userDto "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/user/dto"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/user/repository"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/helpers"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -79,10 +79,7 @@ func (s *authService) Login(ctx context.Context, req userDto.UserLoginRequest) (
 		return dto.TokenResponse{}, dto.ErrInvalidCredentials
 	}
 
-	accessToken, err := s.jwtService.GenerateAccessToken(user.ID.String(), "user")
-	if err != nil {
-		return dto.TokenResponse{}, err
-	}
+	accessToken := s.jwtService.GenerateAccessToken(user.ID.String(), "user")
 
 	return dto.TokenResponse{
 		AccessToken: accessToken,

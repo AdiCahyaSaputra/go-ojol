@@ -3,12 +3,12 @@ package controller
 import (
 	"net/http"
 
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/dto"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/service"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/validation"
-	userDto "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/dto"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/constants"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/utils"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/auth/dto"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/auth/service"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/auth/validation"
+	userDto "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/user/dto"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/samber/do"
 	"gorm.io/gorm"
@@ -19,12 +19,10 @@ type (
 		Register(ctx *gin.Context)
 		Login(ctx *gin.Context)
 		Logout(ctx *gin.Context)
-		JWKS(ctx *gin.Context)
 	}
 
 	authController struct {
 		authService    service.AuthService
-		jwtService     service.JWTService
 		authValidation *validation.AuthValidation
 		db             *gorm.DB
 	}
@@ -32,11 +30,9 @@ type (
 
 func NewAuthController(injector *do.Injector, as service.AuthService) AuthController {
 	db := do.MustInvokeNamed[*gorm.DB](injector, constants.DB)
-	jwtService := do.MustInvokeNamed[service.JWTService](injector, constants.JWTService)
 	authValidation := validation.NewAuthValidation()
 	return &authController{
 		authService:    as,
-		jwtService:     jwtService,
 		authValidation: authValidation,
 		db:             db,
 	}
@@ -92,11 +88,6 @@ func (c *authController) Login(ctx *gin.Context) {
 
 	res := utils.BuildResponseSuccess(userDto.MESSAGE_SUCCESS_LOGIN, result)
 	ctx.JSON(http.StatusOK, res)
-}
-
-func (c *authController) JWKS(ctx *gin.Context) {
-	ctx.Header("Cache-Control", "public, max-age=300")
-	ctx.JSON(http.StatusOK, c.jwtService.JWKS())
 }
 
 func (c *authController) Logout(ctx *gin.Context) {

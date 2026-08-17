@@ -1,6 +1,4 @@
 *.env
-*.pem
-keys/
 storage/
 assets/
 volumes/

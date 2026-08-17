@@ -3,7 +3,7 @@ package middlewares
 import (
 	"net/http"
 
-	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/config"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/config"
 	"github.com/gin-gonic/gin"
 )
 

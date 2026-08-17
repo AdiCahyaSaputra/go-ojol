@@ -1,25 +1,14 @@
 package script
 
-import (
-	"fmt"
+import "fmt"
 
-	"gorm.io/gorm"
-)
+type ExampleScript struct{}
 
-type (
-	ExampleScript struct {
-		db *gorm.DB
-	}
-)
-
-func NewExampleScript(db *gorm.DB) *ExampleScript {
-	return &ExampleScript{
-		db: db,
-	}
+func NewExampleScript() *ExampleScript {
+	return &ExampleScript{}
 }
 
 func (s *ExampleScript) Run() error {
-	// your script here
 	fmt.Println("example script running")
 	return nil
 }

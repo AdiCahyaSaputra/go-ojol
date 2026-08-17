@@ -1,16 +1,11 @@
 package script
 
-import (
-	"errors"
+import "errors"
 
-	"gorm.io/gorm"
-)
-
-func Script(scriptName string, db *gorm.DB) error {
+func Script(scriptName string) error {
 	switch scriptName {
 	case "example_script":
-		exampleScript := NewExampleScript(db)
-		return exampleScript.Run()
+		return NewExampleScript().Run()
 	default:
 		return errors.New("script not found")
 	}

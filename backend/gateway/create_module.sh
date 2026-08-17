@@ -15,22 +15,16 @@ echo "🚀 Creating module: $MODULE_NAME -> $PASCAL_MODULE_NAME"
 echo "📌 PascalCase: $PASCAL_MODULE_NAME | camelCase: $CAMEL_MODULE_NAME"
 
 mkdir -p modules/$MODULE_NAME/controller
-mkdir -p modules/$MODULE_NAME/service
-mkdir -p modules/$MODULE_NAME/repository
 mkdir -p modules/$MODULE_NAME/dto
 mkdir -p modules/$MODULE_NAME/validation
 mkdir -p modules/$MODULE_NAME/tests
-mkdir -p modules/$MODULE_NAME/query
 
 cat > modules/$MODULE_NAME/controller/${MODULE_NAME}_controller.go << EOF
 package controller
 
 import (
-	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/modules/$MODULE_NAME/service"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/modules/$MODULE_NAME/validation"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/pkg/constants"
 	"github.com/samber/do"
-	"gorm.io/gorm"
 )
 
 type (
@@ -38,67 +32,14 @@ type (
 	}
 
 	${CAMEL_MODULE_NAME}Controller struct {
-		${CAMEL_MODULE_NAME}Service    service.${PASCAL_MODULE_NAME}Service
 		${CAMEL_MODULE_NAME}Validation *validation.${PASCAL_MODULE_NAME}Validation
-		db                             *gorm.DB
 	}
 )
 
-func New${PASCAL_MODULE_NAME}Controller(injector *do.Injector, s service.${PASCAL_MODULE_NAME}Service) ${PASCAL_MODULE_NAME}Controller {
-	db := do.MustInvokeNamed[*gorm.DB](injector, constants.DB)
+func New${PASCAL_MODULE_NAME}Controller(injector *do.Injector) ${PASCAL_MODULE_NAME}Controller {
 	${CAMEL_MODULE_NAME}Validation := validation.New${PASCAL_MODULE_NAME}Validation()
 	return &${CAMEL_MODULE_NAME}Controller{
-		${CAMEL_MODULE_NAME}Service:    s,
 		${CAMEL_MODULE_NAME}Validation: ${CAMEL_MODULE_NAME}Validation,
-		db:                             db,
-	}
-}
-EOF
-
-cat > modules/$MODULE_NAME/service/${MODULE_NAME}_service.go << EOF
-package service
-
-import (
-	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/modules/$MODULE_NAME/repository"
-	"gorm.io/gorm"
-)
-
-type ${PASCAL_MODULE_NAME}Service interface {
-}
-
-type ${CAMEL_MODULE_NAME}Service struct {
-	${CAMEL_MODULE_NAME}Repository repository.${PASCAL_MODULE_NAME}Repository
-	db                            *gorm.DB
-}
-
-func New${PASCAL_MODULE_NAME}Service(
-	${CAMEL_MODULE_NAME}Repo repository.${PASCAL_MODULE_NAME}Repository,
-	db *gorm.DB,
-) ${PASCAL_MODULE_NAME}Service {
-	return &${CAMEL_MODULE_NAME}Service{
-		${CAMEL_MODULE_NAME}Repository: ${CAMEL_MODULE_NAME}Repo,
-		db:                            db,
-	}
-}
-EOF
-
-cat > modules/$MODULE_NAME/repository/${MODULE_NAME}_repository.go << EOF
-package repository
-
-import (
-	"gorm.io/gorm"
-)
-
-type ${PASCAL_MODULE_NAME}Repository interface {
-}
-
-type ${CAMEL_MODULE_NAME}Repository struct {
-	db *gorm.DB
-}
-
-func New${PASCAL_MODULE_NAME}Repository(db *gorm.DB) ${PASCAL_MODULE_NAME}Repository {
-	return &${CAMEL_MODULE_NAME}Repository{
-		db: db,
 	}
 }
 EOF
@@ -112,7 +53,7 @@ const (
 )
 
 type (
-	${PASCAL_MODULE_NAME}CreateRequest struct {
+	${PASCAL_MODULE_NAME}Request struct {
 	}
 
 	${PASCAL_MODULE_NAME}Response struct {
@@ -139,8 +80,7 @@ func New${PASCAL_MODULE_NAME}Validation() *${PASCAL_MODULE_NAME}Validation {
 }
 EOF
 
-for file in controller service repository validation; do
-cat > modules/$MODULE_NAME/tests/${MODULE_NAME}_${file}_test.go << EOF
+cat > modules/$MODULE_NAME/tests/${MODULE_NAME}_validation_test.go << EOF
 package tests
 
 import (
@@ -148,11 +88,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test${PASCAL_MODULE_NAME}$(echo $file | sed 's/.*/\u&/') (t *testing.T) {
+func Test${PASCAL_MODULE_NAME}Validation(t *testing.T) {
 	assert.True(t, true)
 }
 EOF
-done
 
 cat > modules/$MODULE_NAME/routes.go << EOF
 package $MODULE_NAME
@@ -164,11 +103,11 @@ import (
 )
 
 func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
-	${CAMEL_MODULE_NAME}Controller := do.MustInvoke[controller.${PASCAL_MODULE_NAME}Controller](injector)
+	_ = do.MustInvoke[controller.${PASCAL_MODULE_NAME}Controller](injector)
 
 	${CAMEL_MODULE_NAME}Routes := server.Group("/api/$MODULE_NAME")
 	{
-		// TODO: add your endpoints here
+		_ = ${CAMEL_MODULE_NAME}Routes
 	}
 }
 EOF

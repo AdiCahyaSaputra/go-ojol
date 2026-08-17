@@ -5,20 +5,17 @@ import (
 	"os"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/middlewares"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/modules/auth"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/modules/user"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/providers"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/script"
+	"github.com/joho/godotenv"
 	"github.com/samber/do"
 
-	"github.com/common-nighthawk/go-figure"
 	"github.com/gin-gonic/gin"
 )
 
-func args(injector *do.Injector) bool {
+func args() bool {
 	if len(os.Args) > 1 {
-		flag := script.Commands(injector)
-		return flag
+		return script.Commands()
 	}
 
 	return true
@@ -39,31 +36,25 @@ func run(server *gin.Engine) {
 		serve = ":" + port
 	}
 
-	myFigure := figure.NewColorFigure("Caknoo", "", "green", true)
-	myFigure.Print()
-
 	if err := server.Run(serve); err != nil {
 		log.Fatalf("error running server: %v", err)
 	}
 }
 
 func main() {
-	var (
-		injector = do.New()
-	)
+	_ = godotenv.Load(".env")
 
+	injector := do.New()
 	providers.RegisterDependencies(injector)
 
-	if !args(injector) {
+	if !args() {
 		return
 	}
 
 	server := gin.Default()
 	server.Use(middlewares.CORSMiddleware())
 
-	// Register module routes
-	user.RegisterRoutes(server, injector)
-	auth.RegisterRoutes(server, injector)
+	// Register module routes here
 
 	run(server)
 }

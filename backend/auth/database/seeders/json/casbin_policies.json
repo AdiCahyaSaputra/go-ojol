@@ -1,0 +1,44 @@
+[
+  {
+    "ptype": "p",
+    "v0": "admin",
+    "v1": "user",
+    "v2": "read"
+  },
+  {
+    "ptype": "p",
+    "v0": "admin",
+    "v1": "user",
+    "v2": "update"
+  },
+  {
+    "ptype": "p",
+    "v0": "admin",
+    "v1": "user",
+    "v2": "delete"
+  },
+  {
+    "ptype": "p",
+    "v0": "customer",
+    "v1": "user",
+    "v2": "read"
+  },
+  {
+    "ptype": "p",
+    "v0": "customer",
+    "v1": "user",
+    "v2": "update"
+  },
+  {
+    "ptype": "p",
+    "v0": "driver",
+    "v1": "user",
+    "v2": "read"
+  },
+  {
+    "ptype": "p",
+    "v0": "driver",
+    "v1": "user",
+    "v2": "update"
+  }
+]

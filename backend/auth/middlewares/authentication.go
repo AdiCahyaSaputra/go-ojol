@@ -47,8 +47,16 @@ func Authenticate(jwtService service.JWTService) gin.HandlerFunc {
 			return
 		}
 
+		email, err := jwtService.GetEmailByToken(authHeader)
+		if err != nil {
+			response := utils.BuildResponseFailed(dto.MESSAGE_FAILED_PROSES_REQUEST, err.Error(), nil)
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response)
+			return
+		}
+
 		ctx.Set("token", authHeader)
 		ctx.Set("user_id", userId)
+		ctx.Set("email", email)
 		ctx.Next()
 	}
 }

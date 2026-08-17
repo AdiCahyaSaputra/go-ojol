@@ -41,14 +41,6 @@ func (v *AuthValidation) ValidateResetPasswordRequest(req dto.ResetPasswordReque
 	return v.validate.Struct(req)
 }
 
-func (v *AuthValidation) ValidateSendVerificationEmailRequest(req userDto.SendVerificationEmailRequest) error {
-	return v.validate.Struct(req)
-}
-
-func (v *AuthValidation) ValidateVerifyEmailRequest(req userDto.VerifyEmailRequest) error {
-	return v.validate.Struct(req)
-}
-
 // Custom validators
 func validatePassword(fl validator.FieldLevel) bool {
 	password := fl.Field().String()

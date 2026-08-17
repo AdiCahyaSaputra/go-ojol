@@ -1,0 +1,23 @@
+---
+description: When the user mentions a casbin_* prefix, extend Casbin seed JSON and the generator — do not add a new CLI flag.
+alwaysApply: true
+---
+
+# Casbin seed files (`casbin_*`)
+
+If the user mentions a `casbin_*` prefix (e.g. `casbin_trip`, `casbin_payment`), treat that as a request to extend Casbin seed data in `backend/auth`.
+
+## Do
+
+- Update policy/grouping definitions in [backend/auth/script/casbin_seed.go](backend/auth/script/casbin_seed.go)
+- Keep JSON in sync:
+  - [backend/auth/database/seeders/json/casbin_policies.json](backend/auth/database/seeders/json/casbin_policies.json) — `p, <role>, <resource>, <create|read|update|delete>`
+  - [backend/auth/database/seeders/json/casbin_grouping.json](backend/auth/database/seeders/json/casbin_grouping.json) — `g, <email>, <role>`
+- Keep the CLI as `go run cmd/main.go --script:casbin_seed` (no extra flags)
+
+## Policy shape
+
+```
+g, <user_email>, <customer|driver|admin>
+p, <role>, <user|trip|payment|...>, <create|read|update|delete>
+```

@@ -4,9 +4,11 @@ import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/config"
 	authController "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/controller"
 	authService "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/service"
+	casbinrepo "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/casbin/repository"
 	userController "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/controller"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/repository"
 	userService "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/service"
+	pkgcasbin "github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/casbin"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/constants"
 	"github.com/samber/do"
 	"gorm.io/gorm"
@@ -25,13 +27,20 @@ func RegisterDependencies(injector *do.Injector) {
 		return authService.NewJWTService()
 	})
 
+	do.ProvideNamed(injector, constants.CasbinEnforcer, func(i *do.Injector) (pkgcasbin.Enforcer, error) {
+		db := do.MustInvokeNamed[*gorm.DB](i, constants.DB)
+		return pkgcasbin.NewEnforcer(db)
+	})
+
 	db := do.MustInvokeNamed[*gorm.DB](injector, constants.DB)
 	jwtService := do.MustInvokeNamed[authService.JWTService](injector, constants.JWTService)
+	enforcer := do.MustInvokeNamed[pkgcasbin.Enforcer](injector, constants.CasbinEnforcer)
 
 	userRepository := repository.NewUserRepository(db)
+	casbinRepository := casbinrepo.NewCasbinRepository(db)
 
 	userService := userService.NewUserService(userRepository, db)
-	authService := authService.NewAuthService(userRepository, jwtService, db)
+	authService := authService.NewAuthService(userRepository, casbinRepository, jwtService, enforcer, db)
 
 	do.Provide(
 		injector, func(i *do.Injector) (userController.UserController, error) {

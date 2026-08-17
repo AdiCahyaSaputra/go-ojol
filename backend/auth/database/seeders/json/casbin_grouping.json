@@ -1,0 +1,12 @@
+[
+  {
+    "ptype": "g",
+    "v0": "admin1234@gmail.com",
+    "v1": "admin"
+  },
+  {
+    "ptype": "g",
+    "v0": "user1234@gmail.com",
+    "v1": "customer"
+  }
+]

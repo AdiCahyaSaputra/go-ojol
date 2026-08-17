@@ -2,7 +2,7 @@ package dto
 
 import (
 	"errors"
-	"mime/multipart"
+	"time"
 )
 
 const (
@@ -18,77 +18,55 @@ const (
 	MESSAGE_FAILED_DELETE_USER        = "failed delete user"
 	MESSAGE_FAILED_PROSES_REQUEST     = "failed proses request"
 	MESSAGE_FAILED_DENIED_ACCESS      = "denied access"
-	MESSAGE_FAILED_VERIFY_EMAIL       = "failed verify email"
 
 	// Success
-	MESSAGE_SUCCESS_REGISTER_USER           = "success create user"
-	MESSAGE_SUCCESS_GET_LIST_USER           = "success get list user"
-	MESSAGE_SUCCESS_GET_USER                = "success get user"
-	MESSAGE_SUCCESS_LOGIN                   = "success login"
-	MESSAGE_SUCCESS_UPDATE_USER             = "success update user"
-	MESSAGE_SUCCESS_DELETE_USER             = "success delete user"
-	MESSAGE_SEND_VERIFICATION_EMAIL_SUCCESS = "success send verification email"
-	MESSAGE_SUCCESS_VERIFY_EMAIL            = "success verify email"
+	MESSAGE_SUCCESS_REGISTER_USER = "success create user"
+	MESSAGE_SUCCESS_GET_LIST_USER = "success get list user"
+	MESSAGE_SUCCESS_GET_USER      = "success get user"
+	MESSAGE_SUCCESS_LOGIN         = "success login"
+	MESSAGE_SUCCESS_UPDATE_USER   = "success update user"
+	MESSAGE_SUCCESS_DELETE_USER   = "success delete user"
 )
 
 var (
-	ErrCreateUser             = errors.New("failed to create user")
-	ErrGetUserById            = errors.New("failed to get user by id")
-	ErrGetUserByEmail         = errors.New("failed to get user by email")
-	ErrEmailAlreadyExists     = errors.New("email already exist")
-	ErrUpdateUser             = errors.New("failed to update user")
-	ErrUserNotFound           = errors.New("user not found")
-	ErrEmailNotFound          = errors.New("email not found")
-	ErrDeleteUser             = errors.New("failed to delete user")
-	ErrTokenInvalid           = errors.New("token invalid")
-	ErrTokenExpired           = errors.New("token expired")
-	ErrAccountAlreadyVerified = errors.New("account already verified")
+	ErrCreateUser         = errors.New("failed to create user")
+	ErrGetUserById        = errors.New("failed to get user by id")
+	ErrGetUserByEmail     = errors.New("failed to get user by email")
+	ErrEmailAlreadyExists = errors.New("email already exist")
+	ErrUpdateUser         = errors.New("failed to update user")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrEmailNotFound      = errors.New("email not found")
+	ErrDeleteUser         = errors.New("failed to delete user")
+	ErrTokenInvalid       = errors.New("token invalid")
+	ErrTokenExpired       = errors.New("token expired")
+	ErrInvalidRole        = errors.New("invalid role")
+	ErrRoleNotAssigned    = errors.New("role not assigned")
 )
 
 type (
 	UserCreateRequest struct {
-		Name       string                `json:"name" form:"name" binding:"required,min=2,max=100"`
-		TelpNumber string                `json:"telp_number" form:"telp_number" binding:"omitempty,min=8,max=20"`
-		Email      string                `json:"email" form:"email" binding:"required,email"`
-		Password   string                `json:"password" form:"password" binding:"required,min=8"`
-		Image      *multipart.FileHeader `json:"image" form:"image"`
+		Email    string `json:"email" form:"email" binding:"required,email"`
+		Password string `json:"password" form:"password" binding:"required,min=8"`
+		Role     string `json:"role" form:"role" binding:"required,oneof=customer driver" validate:"required,oneof=customer driver"`
 	}
 
 	UserResponse struct {
-		ID         string `json:"id"`
-		Name       string `json:"name"`
-		Email      string `json:"email"`
-		TelpNumber string `json:"telp_number"`
-		Role       string `json:"role"`
-		ImageUrl   string `json:"image_url"`
-		IsVerified bool   `json:"is_verified"`
+		ID        string    `json:"id"`
+		Email     string    `json:"email"`
+		Role      string    `json:"role,omitempty"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
 	}
+
 	UserUpdateRequest struct {
-		Name       string `json:"name" form:"name" binding:"omitempty,min=2,max=100"`
-		TelpNumber string `json:"telp_number" form:"telp_number" binding:"omitempty,min=8,max=20"`
-		Email      string `json:"email" form:"email" binding:"omitempty,email"`
+		Email string `json:"email" form:"email" binding:"omitempty,email"`
 	}
 
 	UserUpdateResponse struct {
-		ID         string `json:"id"`
-		Name       string `json:"name"`
-		TelpNumber string `json:"telp_number"`
-		Role       string `json:"role"`
-		Email      string `json:"email"`
-		IsVerified bool   `json:"is_verified"`
-	}
-
-	SendVerificationEmailRequest struct {
-		Email string `json:"email" form:"email" binding:"required"`
-	}
-
-	VerifyEmailRequest struct {
-		Token string `json:"token" form:"token" binding:"required"`
-	}
-
-	VerifyEmailResponse struct {
-		Email      string `json:"email"`
-		IsVerified bool   `json:"is_verified"`
+		ID        string    `json:"id"`
+		Email     string    `json:"email"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
 	}
 
 	UserLoginRequest struct {

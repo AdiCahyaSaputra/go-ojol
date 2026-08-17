@@ -12,7 +12,7 @@
     "telp_number": "08123456789",
     "email": "user1234@gmail.com",
     "password": "user1234",
-    "role": "user",
+    "role": "customer",
     "is_verified": true
   }
 ]

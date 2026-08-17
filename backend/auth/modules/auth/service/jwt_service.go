@@ -36,15 +36,17 @@ type JWKS struct {
 }
 
 type JWTService interface {
-	GenerateAccessToken(userId string, role string) (string, error)
+	GenerateAccessToken(userId string, email string, role string) (string, error)
 	GenerateRefreshToken() (string, time.Time)
 	ValidateToken(token string) (*jwt.Token, error)
 	GetUserIDByToken(token string) (string, error)
+	GetEmailByToken(token string) (string, error)
 	JWKS() JWKS
 }
 
 type jwtCustomClaim struct {
 	UserID string `json:"user_id"`
+	Email  string `json:"email"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
@@ -157,11 +159,12 @@ func jwkThumbprint(jwk JWK) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(sum[:]), nil
 }
 
-func (j *jwtService) GenerateAccessToken(userId string, role string) (string, error) {
+func (j *jwtService) GenerateAccessToken(userId string, email string, role string) (string, error) {
 	claims := jwtCustomClaim{
-		userId,
-		role,
-		jwt.RegisteredClaims{
+		UserID: userId,
+		Email:  email,
+		Role:   role,
+		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.accessExpiry)),
 			Issuer:    j.issuer,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -198,14 +201,35 @@ func (j *jwtService) ValidateToken(token string) (*jwt.Token, error) {
 }
 
 func (j *jwtService) GetUserIDByToken(token string) (string, error) {
+	return j.claimByToken(token, "user_id")
+}
+
+func (j *jwtService) GetEmailByToken(token string) (string, error) {
+	return j.claimByToken(token, "email")
+}
+
+func (j *jwtService) claimByToken(token, key string) (string, error) {
 	tToken, err := j.ValidateToken(token)
 	if err != nil {
 		return "", err
 	}
 
-	claims := tToken.Claims.(jwt.MapClaims)
-	id := fmt.Sprintf("%v", claims["user_id"])
-	return id, nil
+	claims, ok := tToken.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("invalid token claims")
+	}
+
+	value, exists := claims[key]
+	if !exists || value == nil {
+		return "", fmt.Errorf("%s not found in token", key)
+	}
+
+	s := fmt.Sprintf("%v", value)
+	if s == "" || s == "<nil>" {
+		return "", fmt.Errorf("%s not found in token", key)
+	}
+
+	return s, nil
 }
 
 func (j *jwtService) JWKS() JWKS {

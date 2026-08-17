@@ -13,10 +13,9 @@ func TestAuthValidation_ValidateRegisterRequest_Success(t *testing.T) {
 	authValidation := validation.NewAuthValidation()
 
 	req := userDto.UserCreateRequest{
-		Name:       "Test User",
-		Email:      "test@example.com",
-		TelpNumber: "12345678",
-		Password:   "password123",
+		Email:    "test@example.com",
+		Password: "password123",
+		Role:     "customer",
 	}
 
 	err := authValidation.ValidateRegisterRequest(req)
@@ -28,10 +27,9 @@ func TestAuthValidation_ValidateRegisterRequest_InvalidEmail(t *testing.T) {
 	authValidation := validation.NewAuthValidation()
 
 	req := userDto.UserCreateRequest{
-		Name:       "Test User",
-		Email:      "invalid-email", // This will be caught by binding:"required,email" in DTO
-		TelpNumber: "12345678",
-		Password:   "password123",
+		Email:    "invalid-email", // This will be caught by binding:"required,email" in DTO
+		Password: "password123",
+		Role:     "customer",
 	}
 
 	err := authValidation.ValidateRegisterRequest(req)
@@ -45,10 +43,9 @@ func TestAuthValidation_ValidateRegisterRequest_ShortPassword(t *testing.T) {
 	authValidation := validation.NewAuthValidation()
 
 	req := userDto.UserCreateRequest{
-		Name:       "Test User",
-		Email:      "test@example.com",
-		TelpNumber: "12345678",
-		Password:   "123", // This will be caught by binding:"required,min=8" in DTO
+		Email:    "test@example.com",
+		Password: "123", // This will be caught by binding:"required,min=8" in DTO
+		Role:     "customer",
 	}
 
 	err := authValidation.ValidateRegisterRequest(req)
@@ -81,4 +78,31 @@ func TestAuthValidation_ValidateRefreshTokenRequest_Success(t *testing.T) {
 	err := authValidation.ValidateRefreshTokenRequest(req)
 
 	assert.NoError(t, err)
+}
+
+func TestAuthValidation_ValidateRegisterRequest_RejectsAdminRole(t *testing.T) {
+	authValidation := validation.NewAuthValidation()
+
+	req := userDto.UserCreateRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+		Role:     "admin",
+	}
+
+	err := authValidation.ValidateRegisterRequest(req)
+
+	assert.Error(t, err)
+}
+
+func TestAuthValidation_ValidateRegisterRequest_RejectsMissingRole(t *testing.T) {
+	authValidation := validation.NewAuthValidation()
+
+	req := userDto.UserCreateRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+
+	err := authValidation.ValidateRegisterRequest(req)
+
+	assert.Error(t, err)
 }

@@ -178,6 +178,4 @@ create table payout (
 
 # Authentication
 
-Basic JWT stateless flow
-- Store `access_token` in httpOnly cookie with very short expiration
-- Store `refresh_token` in Redis along with user uuid
+JWT and JWKS accross service

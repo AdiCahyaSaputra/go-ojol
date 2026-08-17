@@ -31,7 +31,7 @@ func newTestJWTService(t *testing.T) (service.JWTService, *ecdsa.PrivateKey) {
 func TestJWTService_GenerateAndValidateAccessToken(t *testing.T) {
 	svc, _ := newTestJWTService(t)
 
-	token, err := svc.GenerateAccessToken("user-1", "admin")
+	token, err := svc.GenerateAccessToken("user-1", "admin@example.com", "admin")
 	require.NoError(t, err)
 	require.NotEmpty(t, token)
 
@@ -42,12 +42,16 @@ func TestJWTService_GenerateAndValidateAccessToken(t *testing.T) {
 	userID, err := svc.GetUserIDByToken(token)
 	require.NoError(t, err)
 	assert.Equal(t, "user-1", userID)
+
+	email, err := svc.GetEmailByToken(token)
+	require.NoError(t, err)
+	assert.Equal(t, "admin@example.com", email)
 }
 
 func TestJWTService_JWKSMatchesSignedHeader(t *testing.T) {
 	svc, _ := newTestJWTService(t)
 
-	token, err := svc.GenerateAccessToken("user-1", "user")
+	token, err := svc.GenerateAccessToken("user-1", "user@example.com", "customer")
 	require.NoError(t, err)
 
 	jwks := svc.JWKS()
@@ -120,7 +124,7 @@ func TestNewJWTService_LoadsPEMFromPath(t *testing.T) {
 	require.Len(t, jwks.Keys, 1)
 	assert.Equal(t, "test-kid", jwks.Keys[0].Kid)
 
-	token, err := svc.GenerateAccessToken("user-1", "user")
+	token, err := svc.GenerateAccessToken("user-1", "user@example.com", "customer")
 	require.NoError(t, err)
 
 	parsed, err := svc.ValidateToken(token)

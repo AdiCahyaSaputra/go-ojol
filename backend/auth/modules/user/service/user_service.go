@@ -36,8 +36,10 @@ func (s *userService) GetUserById(ctx context.Context, userId string) (dto.UserR
 	}
 
 	return dto.UserResponse{
-		ID:    user.ID.String(),
-		Email: user.Email,
+		ID:        user.ID.String(),
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
 	}, nil
 }
 
@@ -57,8 +59,10 @@ func (s *userService) Update(ctx context.Context, req dto.UserUpdateRequest, use
 	}
 
 	return dto.UserUpdateResponse{
-		ID:    updatedUser.ID.String(),
-		Email: updatedUser.Email,
+		ID:        updatedUser.ID.String(),
+		Email:     updatedUser.Email,
+		CreatedAt: updatedUser.CreatedAt,
+		UpdatedAt: updatedUser.UpdatedAt,
 	}, nil
 }
 

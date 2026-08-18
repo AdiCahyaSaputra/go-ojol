@@ -5,7 +5,6 @@ go 1.26.0
 require (
 	github.com/Caknoooo/go-pagination v0.1.0
 	github.com/casbin/casbin/v2 v2.135.0
-	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/golang-jwt/jwt/v4 v4.5.2

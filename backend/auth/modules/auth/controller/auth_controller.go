@@ -78,7 +78,7 @@ func (c *authController) Login(ctx *gin.Context) {
 
 	// Validate request
 	if err := c.authValidation.ValidateLoginRequest(req); err != nil {
-		res := utils.BuildResponseFailed("Validation failed", err.Error(), nil)
+		res := utils.BuildResponseFailed("Validation failed", err, nil)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}

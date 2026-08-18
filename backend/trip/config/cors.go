@@ -3,11 +3,12 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
 
-func SetUpCors() string {
+func SetUpCors() []string {
 	err := godotenv.Load(".env")
 	if err != nil {
 		panic(err)
@@ -19,5 +20,5 @@ func SetUpCors() string {
 		log.Fatal("CORS_ALLOWED_ORIGINS is not set")
 	}
 
-	return allowedOrigins
+	return strings.Split(allowedOrigins, ",")
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/script"
 	"github.com/samber/do"
 
-	"github.com/common-nighthawk/go-figure"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,9 +37,6 @@ func run(server *gin.Engine) {
 	} else {
 		serve = ":" + port
 	}
-
-	myFigure := figure.NewColorFigure("Caknoo", "", "green", true)
-	myFigure.Print()
 
 	if err := server.Run(serve); err != nil {
 		log.Fatalf("error running server: %v", err)

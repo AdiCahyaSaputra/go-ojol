@@ -5,13 +5,11 @@ import (
 	"os"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/middlewares"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/auth"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/user"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/providers"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/script"
 	"github.com/samber/do"
 
-	"github.com/common-nighthawk/go-figure"
 	"github.com/gin-gonic/gin"
 )
 
@@ -39,9 +37,6 @@ func run(server *gin.Engine) {
 		serve = ":" + port
 	}
 
-	myFigure := figure.NewColorFigure("Caknoo", "", "green", true)
-	myFigure.Print()
-
 	if err := server.Run(serve); err != nil {
 		log.Fatalf("error running server: %v", err)
 	}
@@ -61,9 +56,7 @@ func main() {
 	server := gin.Default()
 	server.Use(middlewares.CORSMiddleware())
 
-	// Register module routes
-	user.RegisterRoutes(server, injector)
-	auth.RegisterRoutes(server, injector)
+	trip.RegisterRoutes(server, injector)
 
 	run(server)
 }

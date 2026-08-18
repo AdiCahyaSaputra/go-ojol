@@ -2,12 +2,9 @@ package providers
 
 import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/config"
-	authController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/auth/controller"
-	authService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/auth/service"
-	userController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/user/controller"
-	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/user/repository"
-	userService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/user/service"
+	tripController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/controller"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
 	"github.com/samber/do"
 	"gorm.io/gorm"
 )
@@ -21,27 +18,11 @@ func InitDatabase(injector *do.Injector) {
 func RegisterDependencies(injector *do.Injector) {
 	InitDatabase(injector)
 
-	do.ProvideNamed(injector, constants.JWTService, func(i *do.Injector) (authService.JWTService, error) {
-		return authService.NewJWTService(), nil
+	do.ProvideNamed(injector, constants.JWKSVerifier, func(i *do.Injector) (jwks.Verifier, error) {
+		return jwks.NewVerifierFromEnv()
 	})
 
-	db := do.MustInvokeNamed[*gorm.DB](injector, constants.DB)
-	jwtService := do.MustInvokeNamed[authService.JWTService](injector, constants.JWTService)
-
-	userRepository := repository.NewUserRepository(db)
-
-	userService := userService.NewUserService(userRepository, db)
-	authService := authService.NewAuthService(userRepository, jwtService, db)
-
-	do.Provide(
-		injector, func(i *do.Injector) (userController.UserController, error) {
-			return userController.NewUserController(i, userService), nil
-		},
-	)
-
-	do.Provide(
-		injector, func(i *do.Injector) (authController.AuthController, error) {
-			return authController.NewAuthController(i, authService), nil
-		},
-	)
+	do.Provide(injector, func(i *do.Injector) (tripController.TripController, error) {
+		return tripController.NewTripController(), nil
+	})
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/middlewares"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/providers"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/proxy"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/script"
 	"github.com/joho/godotenv"
 	"github.com/samber/do"
@@ -51,10 +52,40 @@ func main() {
 		return
 	}
 
+	authURL := os.Getenv("AUTH_SERVICE_URL")
+	tripURL := os.Getenv("TRIP_SERVICE_URL")
+	if authURL == "" || tripURL == "" {
+		log.Fatal("AUTH_SERVICE_URL and TRIP_SERVICE_URL are required")
+	}
+
 	server := gin.Default()
 	server.Use(middlewares.CORSMiddleware())
 
-	// Register module routes here
+	proxyServers := []proxy.ProxyCfg{
+		{
+			Name: "Auth Proxy",
+			Url:  authURL,
+			UrlPaths: []string{
+				"/.well-known/jwks.json",
+				"/api/auth",
+				"/api/auth/*path",
+				"/api/user",
+				"/api/user/*path",
+			},
+		},
+		{
+			Name: "Trip Proxy",
+			Url:  tripURL,
+			UrlPaths: []string{
+				"/api/trip",
+				"/api/trip/*path",
+			},
+		},
+	}
+
+	if err := proxy.Register(server, proxyServers); err != nil {
+		log.Fatalf("register proxy: %v", err)
+	}
 
 	run(server)
 }

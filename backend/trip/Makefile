@@ -22,19 +22,19 @@ run-build: build
 	./main
 
 test:
-	go test -v ./tests
+	go test -v ./...
 
-test-auth:
+test-jwks:
+	go test -v ./pkg/jwks/...
+
+test-trip:
 	go test -v ./modules/trip/tests/...
 
-test-user:
-	go test -v ./modules/user/tests/...
-
 test-all:
-	go test -v ./modules/.../tests/...
+	go test -v ./...
 
 test-coverage:
-	go test -v -coverprofile=coverage.out ./modules/.../tests/...
+	go test -v -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out
 
 module:

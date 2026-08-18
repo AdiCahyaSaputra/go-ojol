@@ -17,10 +17,11 @@ func New(rawURL string) (*httputil.ReverseProxy, error) {
 		return nil, fmt.Errorf("invalid upstream URL %q", rawURL)
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(target)
-	proxy.Rewrite = func(req *httputil.ProxyRequest) {
-		req.SetURL(target)
-		req.SetXForwarded()
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(req *httputil.ProxyRequest) {
+			req.SetURL(target)
+			req.SetXForwarded()
+		},
 	}
 
 	return proxy, nil

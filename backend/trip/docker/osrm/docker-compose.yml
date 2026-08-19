@@ -1,0 +1,62 @@
+# Indonesia OSRM (car profile, MLD).
+#
+# First run downloads indonesia-latest.osm.pbf then builds the graph.
+# Expect 30-60 min and about 16GB RAM on extract. Later starts reuse ./data.
+#
+#   docker compose up --build
+#
+# Host port 5001 avoids macOS AirPlay on 5000. Coords are lon,lat.
+#
+#   curl "http://127.0.0.1:5001/route/v1/driving/106.8456,-6.2088;106.8272,-6.1751?overview=false"
+#
+# Rebuild the graph after a new PBF:
+#
+#   OSRM_FORCE_REPREPARE=1 docker compose up osrm-prepare
+
+name: trip-osrm
+
+x-osrm-env: &osrm-env
+  OSRM_REGION: indonesia-latest
+  OSRM_PROFILE: car
+  OSRM_PBF_URL: https://download.geofabrik.de/asia/indonesia-latest.osm.pbf
+  OSRM_MAX_TABLE_SIZE: "10000"
+
+services:
+  osrm-prepare:
+    build: .
+    image: go-ojol-trip-osrm
+    container_name: trip-osrm-prepare
+    environment:
+      <<: *osrm-env
+      OSRM_MODE: prepare
+      OSRM_FORCE_REPREPARE: ${OSRM_FORCE_REPREPARE:-0}
+    volumes:
+      - ./data:/data
+    restart: "no"
+
+  osrm:
+    build: .
+    image: go-ojol-trip-osrm
+    container_name: trip-osrm
+    depends_on:
+      osrm-prepare:
+        condition: service_completed_successfully
+    environment:
+      <<: *osrm-env
+      OSRM_MODE: routed
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./data:/data
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf 'http://127.0.0.1:5000/route/v1/driving/106.8456,-6.2088;106.8272,-6.1751?overview=false' | grep -q '\"code\":\"Ok\"'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s

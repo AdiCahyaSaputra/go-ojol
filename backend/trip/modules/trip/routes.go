@@ -13,7 +13,7 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 	tripController := do.MustInvoke[controller.TripController](injector)
 	verifier := do.MustInvokeNamed[jwks.Verifier](injector, constants.JWKSVerifier)
 
-	tripRoutes := server.Group("/api/trip")
+	tripRoutes := server.Group(constants.ROUTE_GROUP)
 	{
 		tripRoutes.GET("/protected", middlewares.Authenticate(verifier), tripController.Protected)
 	}

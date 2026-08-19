@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/database/entities"
 	"github.com/go-playground/validator/v10"
 )
 
+func joinEnumStrings(enumStrings ...string) string {
+	return strings.Join(enumStrings, ", ")
+}
 
 func ParseValidationError(err any) map[string]string {
 	errorsMap := make(map[string]string)
@@ -36,6 +40,17 @@ func ParseValidationError(err any) map[string]string {
 				errorsMap[field] = fmt.Sprintf("%s must be at least %s characters", fieldErr.Field(), fieldErr.Param())
 			case "max":
 				errorsMap[field] = fmt.Sprintf("%s must be at most %s characters", fieldErr.Field(), fieldErr.Param())
+			case "latlong":
+				errorsMap[field] = fmt.Sprintf("%s must a valid [latitude, longitude] value", fieldErr.Field())
+			case "vehicle_type":
+				errorsMap[field] = fmt.Sprintf(
+					"%s should be one of %s",
+					fieldErr.Field(),
+					joinEnumStrings(
+						string(entities.VehicleTypeCar),
+						string(entities.VehicleTypeMotorcycle),
+					),
+				)
 			default:
 				errorsMap[field] = fmt.Sprintf("%s failed validation: %s", fieldErr.Field(), tag)
 			}

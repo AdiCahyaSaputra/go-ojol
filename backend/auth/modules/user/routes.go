@@ -20,7 +20,7 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 	userUpdate := middlewares.Authorize(enforcer, constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_UPDATE)
 	userDelete := middlewares.Authorize(enforcer, constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_DELETE)
 
-	userRoutes := server.Group("/api/user")
+	userRoutes := server.Group(constants.ROUTE_GROUP + "/user")
 	{
 		userRoutes.GET("", authenticate, userRead, userController.GetAllUser)
 		userRoutes.GET("/me", authenticate, userRead, userController.Me)

@@ -8,6 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type ProxyCfg struct {
+	Name     string
+	Url      string
+	UrlPaths []string
+}
+
 func New(rawURL string) (*httputil.ReverseProxy, error) {
 	target, err := url.Parse(rawURL)
 	if err != nil {

@@ -69,8 +69,6 @@ func main() {
 				"/.well-known/jwks.json",
 				"/api/auth",
 				"/api/auth/*path",
-				"/api/user",
-				"/api/user/*path",
 			},
 		},
 		{

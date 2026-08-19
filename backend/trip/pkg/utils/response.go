@@ -1,5 +1,7 @@
 package utils
 
+import "github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/helpers"
+
 type Response struct {
 	Status  bool   `json:"status"`
 	Message string `json:"message"`
@@ -19,12 +21,20 @@ func BuildResponseSuccess(message string, data any) Response {
 	return res
 }
 
-func BuildResponseFailed(message string, err string, data any) Response {
+func BuildResponseFailed(message string, err any, data any) Response {
+	parsedErrors := helpers.ParseValidationError(err)
+
 	res := Response{
 		Status:  false,
 		Message: message,
-		Error:   err,
 		Data:    data,
 	}
+
+	if errors := parsedErrors["_"]; errors != "" {
+		res.Error = errors
+	} else {
+		res.Error = parsedErrors
+	}
+
 	return res
 }

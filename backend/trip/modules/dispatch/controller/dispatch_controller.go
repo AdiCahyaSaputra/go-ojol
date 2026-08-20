@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/dto"
@@ -46,12 +47,27 @@ func (c *dispatchController) CalculateArgo(ctx *gin.Context) {
 	}
 
 	if err := c.dispatchValidation.ValidateRequest(req); err != nil {
-		res := utils.BuildResponseFailed("Validation failed", err.Error(), nil)
+		res := utils.BuildResponseFailed("Validation failed", err, nil)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}
 
-	// Find best route OSRM, Calculate the distance, Multiply by fare per distance + platform percentage
+	result, err := c.dispatchService.CalculateArgo(ctx.Request.Context(), req)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, service.ErrNoRoute) || errors.Is(err, service.ErrInvalidLatLong) || errors.Is(err, service.ErrUnknownVehicle) {
+			status = http.StatusBadRequest
+		} else if errors.Is(err, service.ErrOSRMUnavailable) {
+			status = http.StatusBadGateway
+		}
+
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_CALCULATE_ARGO, err.Error(), nil)
+		ctx.JSON(status, res)
+		return
+	}
+
+	res := utils.BuildResponseSuccess(dto.MESSAGE_SUCCESS_CALCULATE_ARGO, result)
+	ctx.JSON(http.StatusOK, res)
 }
 
 func (c *dispatchController) FindDriver(ctx *gin.Context) {

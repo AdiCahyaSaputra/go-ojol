@@ -27,6 +27,9 @@ test:
 test-jwks:
 	go test -v ./pkg/jwks/...
 
+test-dispatch:
+	go test -v ./modules/dispatch/tests/...
+
 test-trip:
 	go test -v ./modules/trip/tests/...
 

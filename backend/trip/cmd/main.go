@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/middlewares"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/providers"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/script"
@@ -57,6 +58,7 @@ func main() {
 	server.Use(middlewares.CORSMiddleware())
 
 	trip.RegisterRoutes(server, injector)
+	dispatch.RegisterRoutes(server, injector)
 
 	run(server)
 }

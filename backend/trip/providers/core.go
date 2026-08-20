@@ -1,7 +1,13 @@
 package providers
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/config"
+	dispatchController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/controller"
+	dispatchRepository "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/repository"
+	dispatchService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/service"
 	tripController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/controller"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
@@ -24,5 +30,18 @@ func RegisterDependencies(injector *do.Injector) {
 
 	do.Provide(injector, func(i *do.Injector) (tripController.TripController, error) {
 		return tripController.NewTripController(), nil
+	})
+
+	db := do.MustInvokeNamed[*gorm.DB](injector, constants.DB)
+	dispatchRepo := dispatchRepository.NewDispatchRepository(db)
+	dispatchSvc := dispatchService.NewDispatchService(
+		dispatchRepo,
+		db,
+		&http.Client{Timeout: 10 * time.Second},
+		"",
+	)
+
+	do.Provide(injector, func(i *do.Injector) (dispatchController.DispatchController, error) {
+		return dispatchController.NewDispatchController(i, dispatchSvc), nil
 	})
 }

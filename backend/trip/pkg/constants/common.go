@@ -7,6 +7,14 @@ const (
 	ENUM_PAGINATION_PER_PAGE = 10
 	ENUM_PAGINATION_PAGE     = 1
 
-	DB           = "db"
-	JWKSVerifier = "JWKSVerifier"
+	ENUM_RESOURCE_TRIP = "trip"
+
+	ENUM_ACTION_CREATE = "create"
+	ENUM_ACTION_READ   = "read"
+	ENUM_ACTION_UPDATE = "update"
+	ENUM_ACTION_DELETE = "delete"
+
+	DB             = "db"
+	JWKSVerifier   = "JWKSVerifier"
+	CasbinEnforcer = "CasbinEnforcer"
 )

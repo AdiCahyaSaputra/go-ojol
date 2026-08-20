@@ -27,7 +27,7 @@ import (
 )
 
 func TestCalculateArgo_RequiresBearer(t *testing.T) {
-	router, _ := newCalculateArgoRouter(t, http.NotFoundHandler())
+	router, _ := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", nil)
 	rec := httptest.NewRecorder()
@@ -37,7 +37,7 @@ func TestCalculateArgo_RequiresBearer(t *testing.T) {
 }
 
 func TestCalculateArgo_RejectsInvalidToken(t *testing.T) {
-	router, _ := newCalculateArgoRouter(t, http.NotFoundHandler())
+	router, _ := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{}`))
 	req.Header.Set("Authorization", "Bearer not-a-token")
@@ -49,7 +49,7 @@ func TestCalculateArgo_RejectsInvalidToken(t *testing.T) {
 }
 
 func TestCalculateArgo_RejectsInvalidBody(t *testing.T) {
-	router, sign := newCalculateArgoRouter(t, http.NotFoundHandler())
+	router, sign := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{
 		"pickup_loc": ["1000", "106.8456"],
@@ -79,7 +79,7 @@ func TestCalculateArgo_ReturnsQuote(t *testing.T) {
 			}]
 		}`)
 	})
-	router, sign := newCalculateArgoRouter(t, osrm)
+	router, sign := newCalculateArgoRouter(t, osrm, true)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{
 		"pickup_loc": ["-6.2088", "106.8456"],
@@ -122,7 +122,7 @@ func TestCalculateArgo_NoRouteIsBadRequest(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"code":"NoRoute","routes":[]}`)
 	})
-	router, sign := newCalculateArgoRouter(t, osrm)
+	router, sign := newCalculateArgoRouter(t, osrm, true)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{
 		"pickup_loc": ["-6.2088", "106.8456"],
@@ -141,7 +141,7 @@ func TestCalculateArgo_OSRMDownIsBadGateway(t *testing.T) {
 	osrm := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
-	router, sign := newCalculateArgoRouter(t, osrm)
+	router, sign := newCalculateArgoRouter(t, osrm, true)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{
 		"pickup_loc": ["-6.2088", "106.8456"],
@@ -156,7 +156,23 @@ func TestCalculateArgo_OSRMDownIsBadGateway(t *testing.T) {
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
 }
 
-func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler) (*gin.Engine, func(userID, email, role string) string) {
+func TestCalculateArgo_DeniesWhenUnauthorized(t *testing.T) {
+	router, sign := newCalculateArgoRouter(t, http.NotFoundHandler(), false)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{
+		"pickup_loc": ["-6.2088", "106.8456"],
+		"destination": ["-6.1754", "106.8272"],
+		"vehicle_type": "motorcycle"
+	}`))
+	req.Header.Set("Authorization", "Bearer "+sign("user-1", "drv@example.com", "driver"))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler, allow bool) (*gin.Engine, func(userID, email, role string) string) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -193,7 +209,12 @@ func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler) (*gin.Engine
 	verifier := jwks.NewVerifier(jwksServer.URL, "go-ojol-auth")
 
 	router := gin.New()
-	router.POST("/api/trip/dispatch/calculate-argo", middlewares.Authenticate(verifier), dispatchCtrl.CalculateArgo)
+	router.POST(
+		"/api/trip/dispatch/calculate-argo",
+		middlewares.Authenticate(verifier),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_CREATE),
+		dispatchCtrl.CalculateArgo,
+	)
 
 	sign := func(userID, email, role string) string {
 		token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
@@ -211,4 +232,16 @@ func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler) (*gin.Engine
 	}
 
 	return router, sign
+}
+
+type stubEnforcer struct {
+	allow bool
+}
+
+func (s *stubEnforcer) Enforce(rvals ...interface{}) (bool, error) {
+	return s.allow, nil
+}
+
+func (s *stubEnforcer) LoadPolicy() error {
+	return nil
 }

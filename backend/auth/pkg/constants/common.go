@@ -6,6 +6,7 @@ const (
 	ENUM_ROLE_DRIVER   = "driver"
 
 	ENUM_RESOURCE_USER = "user"
+	ENUM_RESOURCE_TRIP = "trip"
 
 	ENUM_ACTION_CREATE = "create"
 	ENUM_ACTION_READ   = "read"

@@ -24,6 +24,9 @@ run-build: build
 test:
 	go test -v ./...
 
+test-dir:
+	go test -v 
+
 test-jwks:
 	go test -v ./pkg/jwks/...
 

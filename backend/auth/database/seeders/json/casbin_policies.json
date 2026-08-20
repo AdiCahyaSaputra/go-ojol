@@ -40,5 +40,53 @@
     "v0": "driver",
     "v1": "user",
     "v2": "update"
+  },
+  {
+    "ptype": "p",
+    "v0": "admin",
+    "v1": "trip",
+    "v2": "create"
+  },
+  {
+    "ptype": "p",
+    "v0": "admin",
+    "v1": "trip",
+    "v2": "read"
+  },
+  {
+    "ptype": "p",
+    "v0": "admin",
+    "v1": "trip",
+    "v2": "update"
+  },
+  {
+    "ptype": "p",
+    "v0": "admin",
+    "v1": "trip",
+    "v2": "delete"
+  },
+  {
+    "ptype": "p",
+    "v0": "customer",
+    "v1": "trip",
+    "v2": "create"
+  },
+  {
+    "ptype": "p",
+    "v0": "customer",
+    "v1": "trip",
+    "v2": "read"
+  },
+  {
+    "ptype": "p",
+    "v0": "driver",
+    "v1": "trip",
+    "v2": "read"
+  },
+  {
+    "ptype": "p",
+    "v0": "driver",
+    "v1": "trip",
+    "v2": "update"
   }
 ]

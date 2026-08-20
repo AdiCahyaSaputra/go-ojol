@@ -9,6 +9,7 @@ import (
 	dispatchRepository "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/repository"
 	dispatchService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/service"
 	tripController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/controller"
+	pkgcasbin "github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/casbin"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
 	"github.com/samber/do"
@@ -26,6 +27,11 @@ func RegisterDependencies(injector *do.Injector) {
 
 	do.ProvideNamed(injector, constants.JWKSVerifier, func(i *do.Injector) (jwks.Verifier, error) {
 		return jwks.NewVerifierFromEnv()
+	})
+
+	do.ProvideNamed(injector, constants.CasbinEnforcer, func(i *do.Injector) (pkgcasbin.Enforcer, error) {
+		db := do.MustInvokeNamed[*gorm.DB](i, constants.DB)
+		return pkgcasbin.NewEnforcer(db)
 	})
 
 	do.Provide(injector, func(i *do.Injector) (tripController.TripController, error) {

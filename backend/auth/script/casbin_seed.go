@@ -47,6 +47,14 @@ func casbinPolicySeeds() []casbinRuleSeed {
 		{Ptype: "p", V0: constants.ENUM_ROLE_CUSTOMER, V1: constants.ENUM_RESOURCE_USER, V2: constants.ENUM_ACTION_UPDATE},
 		{Ptype: "p", V0: constants.ENUM_ROLE_DRIVER, V1: constants.ENUM_RESOURCE_USER, V2: constants.ENUM_ACTION_READ},
 		{Ptype: "p", V0: constants.ENUM_ROLE_DRIVER, V1: constants.ENUM_RESOURCE_USER, V2: constants.ENUM_ACTION_UPDATE},
+		{Ptype: "p", V0: constants.ENUM_ROLE_ADMIN, V1: constants.ENUM_RESOURCE_TRIP, V2: constants.ENUM_ACTION_CREATE},
+		{Ptype: "p", V0: constants.ENUM_ROLE_ADMIN, V1: constants.ENUM_RESOURCE_TRIP, V2: constants.ENUM_ACTION_READ},
+		{Ptype: "p", V0: constants.ENUM_ROLE_ADMIN, V1: constants.ENUM_RESOURCE_TRIP, V2: constants.ENUM_ACTION_UPDATE},
+		{Ptype: "p", V0: constants.ENUM_ROLE_ADMIN, V1: constants.ENUM_RESOURCE_TRIP, V2: constants.ENUM_ACTION_DELETE},
+		{Ptype: "p", V0: constants.ENUM_ROLE_CUSTOMER, V1: constants.ENUM_RESOURCE_TRIP, V2: constants.ENUM_ACTION_CREATE},
+		{Ptype: "p", V0: constants.ENUM_ROLE_CUSTOMER, V1: constants.ENUM_RESOURCE_TRIP, V2: constants.ENUM_ACTION_READ},
+		{Ptype: "p", V0: constants.ENUM_ROLE_DRIVER, V1: constants.ENUM_RESOURCE_TRIP, V2: constants.ENUM_ACTION_READ},
+		{Ptype: "p", V0: constants.ENUM_ROLE_DRIVER, V1: constants.ENUM_RESOURCE_TRIP, V2: constants.ENUM_ACTION_UPDATE},
 	}
 }
 

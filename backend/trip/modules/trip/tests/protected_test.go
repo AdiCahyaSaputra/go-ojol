@@ -13,6 +13,7 @@ import (
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/middlewares"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/controller"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
@@ -21,7 +22,7 @@ import (
 )
 
 func TestProtected_RequiresBearer(t *testing.T) {
-	router, _ := newProtectedRouter(t)
+	router, _ := newProtectedRouter(t, true)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/trip/protected", nil)
 	rec := httptest.NewRecorder()
@@ -31,7 +32,7 @@ func TestProtected_RequiresBearer(t *testing.T) {
 }
 
 func TestProtected_RejectsInvalidToken(t *testing.T) {
-	router, _ := newProtectedRouter(t)
+	router, _ := newProtectedRouter(t, true)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/trip/protected", nil)
 	req.Header.Set("Authorization", "Bearer not-a-token")
@@ -42,7 +43,7 @@ func TestProtected_RejectsInvalidToken(t *testing.T) {
 }
 
 func TestProtected_ReturnsClaims(t *testing.T) {
-	router, sign := newProtectedRouter(t)
+	router, sign := newProtectedRouter(t, true)
 	raw := sign("user-1", "user@example.com", "customer")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/trip/protected", nil)
@@ -68,7 +69,19 @@ func TestProtected_ReturnsClaims(t *testing.T) {
 	assert.Equal(t, "customer", body.Data.Role)
 }
 
-func newProtectedRouter(t *testing.T) (*gin.Engine, func(userID, email, role string) string) {
+func TestProtected_DeniesWhenUnauthorized(t *testing.T) {
+	router, sign := newProtectedRouter(t, false)
+	raw := sign("user-1", "drv@example.com", "driver")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/trip/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func newProtectedRouter(t *testing.T, allow bool) (*gin.Engine, func(userID, email, role string) string) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -94,7 +107,12 @@ func newProtectedRouter(t *testing.T) (*gin.Engine, func(userID, email, role str
 
 	verifier := jwks.NewVerifier(jwksServer.URL, "go-ojol-auth")
 	router := gin.New()
-	router.GET("/api/trip/protected", middlewares.Authenticate(verifier), controller.NewTripController().Protected)
+	router.GET(
+		"/api/trip/protected",
+		middlewares.Authenticate(verifier),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_READ),
+		controller.NewTripController().Protected,
+	)
 
 	sign := func(userID, email, role string) string {
 		token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
@@ -112,4 +130,16 @@ func newProtectedRouter(t *testing.T) (*gin.Engine, func(userID, email, role str
 	}
 
 	return router, sign
+}
+
+type stubEnforcer struct {
+	allow bool
+}
+
+func (s *stubEnforcer) Enforce(rvals ...interface{}) (bool, error) {
+	return s.allow, nil
+}
+
+func (s *stubEnforcer) LoadPolicy() error {
+	return nil
 }

@@ -13,6 +13,9 @@ import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/database/entities"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/service"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/drivergeo"
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +40,7 @@ func TestCalculateArgo_MotorcycleFareAndPath(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	svc := service.NewDispatchService(nil, nil, osrm.Client(), osrm.URL)
+	svc := service.NewDispatchService(nil, nil, osrm.Client(), osrm.URL, nil)
 	result, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
@@ -73,7 +76,7 @@ func TestCalculateArgo_CarFare(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	svc := service.NewDispatchService(nil, nil, osrm.Client(), osrm.URL)
+	svc := service.NewDispatchService(nil, nil, osrm.Client(), osrm.URL, nil)
 	result, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
@@ -94,7 +97,7 @@ func TestCalculateArgo_NoRoute(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	svc := service.NewDispatchService(nil, nil, osrm.Client(), osrm.URL)
+	svc := service.NewDispatchService(nil, nil, osrm.Client(), osrm.URL, nil)
 	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
@@ -110,7 +113,7 @@ func TestCalculateArgo_OSRMUnavailable(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	svc := service.NewDispatchService(nil, nil, osrm.Client(), osrm.URL)
+	svc := service.NewDispatchService(nil, nil, osrm.Client(), osrm.URL, nil)
 	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
@@ -126,7 +129,7 @@ func TestCalculateArgo_InvalidJSONFromOSRM(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	svc := service.NewDispatchService(nil, nil, osrm.Client(), osrm.URL)
+	svc := service.NewDispatchService(nil, nil, osrm.Client(), osrm.URL, nil)
 	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
@@ -148,4 +151,48 @@ func TestCalculateArgoResponseJSONIncludesPath(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Contains(t, string(body), `"path":[[-6.2,106.8]]`)
+}
+
+func TestFindDriverService_EmptyList(t *testing.T) {
+	store := newGeoStore(t)
+	svc := service.NewDispatchService(nil, nil, nil, "", store)
+
+	result, err := svc.FindDriver(context.Background(), dto.FindDriverRequest{
+		CurrentLocation: [2]string{"-6.2088", "106.8456"},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, result.Drivers)
+}
+
+func TestFindDriverService_ReturnsNearby(t *testing.T) {
+	store := newGeoStore(t)
+	require.NoError(t, store.SetStandby(context.Background(), "drv-1", -6.2088, 106.8456))
+
+	svc := service.NewDispatchService(nil, nil, nil, "", store)
+	result, err := svc.FindDriver(context.Background(), dto.FindDriverRequest{
+		CurrentLocation: [2]string{"-6.2088", "106.8456"},
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Drivers, 1)
+	assert.Equal(t, "drv-1", result.Drivers[0].UserID)
+	assert.Equal(t, 0, result.Drivers[0].DistanceM)
+	assert.InDelta(t, -6.2088, result.Drivers[0].Location[0], 0.0001)
+	assert.InDelta(t, 106.8456, result.Drivers[0].Location[1], 0.0001)
+}
+
+func TestFindDriverService_InvalidLatLong(t *testing.T) {
+	store := newGeoStore(t)
+	svc := service.NewDispatchService(nil, nil, nil, "", store)
+
+	_, err := svc.FindDriver(context.Background(), dto.FindDriverRequest{
+		CurrentLocation: [2]string{"not-a-lat", "106.8456"},
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, service.ErrInvalidLatLong))
+}
+
+func newGeoStore(t *testing.T) *drivergeo.Store {
+	t.Helper()
+	mr := miniredis.RunT(t)
+	return drivergeo.NewStore(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
 }

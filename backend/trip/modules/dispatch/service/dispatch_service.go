@@ -15,6 +15,7 @@ import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/database/entities"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/repository"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/drivergeo"
 	"gorm.io/gorm"
 )
 
@@ -33,10 +34,12 @@ var (
 	ErrOSRMUnavailable = errors.New("routing service unavailable")
 	ErrInvalidLatLong  = errors.New("invalid lat long")
 	ErrUnknownVehicle  = errors.New("unknown vehicle type")
+	ErrLocationStore   = errors.New("location store unavailable")
 )
 
 type DispatchService interface {
 	CalculateArgo(ctx context.Context, req dto.CalculateArgoRequest) (dto.CalculateArgoResponse, error)
+	FindDriver(ctx context.Context, req dto.FindDriverRequest) (dto.FindDriverResponse, error)
 }
 
 type dispatchService struct {
@@ -44,6 +47,7 @@ type dispatchService struct {
 	db                 *gorm.DB
 	httpClient         *http.Client
 	osrmBaseURL        string
+	locations          *drivergeo.Store
 }
 
 func NewDispatchService(
@@ -51,6 +55,7 @@ func NewDispatchService(
 	db *gorm.DB,
 	httpClient *http.Client,
 	osrmBaseURL string,
+	locations *drivergeo.Store,
 ) DispatchService {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: osrmTimeout}
@@ -64,10 +69,17 @@ func NewDispatchService(
 		db:                 db,
 		httpClient:         httpClient,
 		osrmBaseURL:        strings.TrimRight(osrmBaseURL, "/"),
+		locations:          locations,
 	}
 }
 
 func (s *dispatchService) CalculateArgo(ctx context.Context, req dto.CalculateArgoRequest) (dto.CalculateArgoResponse, error) {
+	vehicle, err := s.dispatchRepository.VehicleById(req.VehicleId)
+
+	if err != nil || vehicle == nil {
+		return dto.CalculateArgoResponse{}, err
+	}
+
 	pickupLat, pickupLng, err := parseLatLong(req.PickupLoc)
 	if err != nil {
 		return dto.CalculateArgoResponse{}, err
@@ -77,7 +89,7 @@ func (s *dispatchService) CalculateArgo(ctx context.Context, req dto.CalculateAr
 		return dto.CalculateArgoResponse{}, err
 	}
 
-	farePerDistance, err := farePerDistanceFor(req.VehicleType)
+	farePerDistance, err := farePerDistanceFor(vehicle.Type)
 	if err != nil {
 		return dto.CalculateArgoResponse{}, err
 	}
@@ -87,10 +99,32 @@ func (s *dispatchService) CalculateArgo(ctx context.Context, req dto.CalculateAr
 		return dto.CalculateArgoResponse{}, err
 	}
 
+	customer, ok := ctx.Value("customer").(entities.Customer)
+
+	if !ok {
+		return dto.CalculateArgoResponse{}, errors.New(dto.MESSAGE_CUSTOMER_NOT_FOUND_CTX)
+	}
+
 	distance := int(math.Round(route.Distance))
 	duration := int(math.Round(route.Duration))
 	base := int(math.Round(float64(distance) / 1000 * float64(farePerDistance)))
 	total := base + base*platformPercentage/100
+
+	err = s.dispatchRepository.PendingArgoTransaction(dto.PendingArgoTransaction{
+		CustomerID:         customer.ID,
+		VehicleID:          vehicle.ID,
+		PickupLatLong:      [2]string{formatCoord(pickupLat), formatCoord(pickupLng)},
+		LastLatLong:        [2]string{formatCoord(pickupLat), formatCoord(pickupLng)},
+		DestinationLatLong: [2]string{formatCoord(destLat), formatCoord(destLng)},
+		Distance:           distance,
+		FarePerDistance:    farePerDistance,
+		PlatformPercentage: platformPercentage,
+		TotalFare:          total,
+	})
+
+	if err != nil {
+		return dto.CalculateArgoResponse{}, err
+	}
 
 	return dto.CalculateArgoResponse{
 		Distance:           distance,
@@ -99,8 +133,34 @@ func (s *dispatchService) CalculateArgo(ctx context.Context, req dto.CalculateAr
 		FarePerDistance:    farePerDistance,
 		PlatformPercentage: platformPercentage,
 		TotalFare:          total,
-		VehicleType:        req.VehicleType,
 	}, nil
+}
+
+func (s *dispatchService) FindDriver(ctx context.Context, req dto.FindDriverRequest) (dto.FindDriverResponse, error) {
+	if s.locations == nil {
+		return dto.FindDriverResponse{}, ErrLocationStore
+	}
+
+	lat, lng, err := parseLatLong(req.CurrentLocation)
+	if err != nil {
+		return dto.FindDriverResponse{}, err
+	}
+
+	nearby, err := s.locations.Nearby(ctx, lat, lng, drivergeo.DefaultRadiusKm, drivergeo.DefaultCount)
+	if err != nil {
+		return dto.FindDriverResponse{}, err
+	}
+
+	drivers := make([]dto.NearbyDriver, 0, len(nearby))
+	for _, driver := range nearby {
+		drivers = append(drivers, dto.NearbyDriver{
+			UserID:    driver.UserID,
+			DistanceM: driver.DistanceM,
+			Location:  [2]float64{driver.Lat, driver.Lng},
+		})
+	}
+
+	return dto.FindDriverResponse{Drivers: drivers}, nil
 }
 
 type osrmRouteResponse struct {

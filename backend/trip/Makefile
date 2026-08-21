@@ -25,7 +25,8 @@ test:
 	go test -v ./...
 
 test-dir:
-	go test -v 
+	@if [ -z "$(dir)" ]; then echo "Usage: make test-dir dir=<dir_path>"; exit 1; fi
+	go test -v $(dir)
 
 test-jwks:
 	go test -v ./pkg/jwks/...

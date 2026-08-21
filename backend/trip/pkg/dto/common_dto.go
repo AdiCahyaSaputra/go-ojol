@@ -2,6 +2,8 @@ package dto
 
 const (
 	// Failed
+	MESSAGE_ROLE_INVALID = "invalid role for logon user"
+	MESSAGE_PROFILE_CONTEXT_NOT_FOUND = "profile context not found, run this middleware after authentication middleware"
 	MESSAGE_FAILED_PROSES_REQUEST = "failed process request"
 	MESSAGE_FAILED_TOKEN_NOT_FOUND = "token not found"
 	MESSAGE_FAILED_TOKEN_NOT_VALID = "token not valid"

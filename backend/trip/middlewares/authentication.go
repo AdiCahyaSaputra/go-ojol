@@ -12,21 +12,18 @@ import (
 
 func Authenticate(verifier jwks.Verifier) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		authHeader := ctx.GetHeader("Authorization")
-
-		if authHeader == "" {
-			response := utils.BuildResponseFailed(dto.MESSAGE_FAILED_PROSES_REQUEST, dto.MESSAGE_FAILED_TOKEN_NOT_FOUND, nil)
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response)
-			return
-		}
-
-		if !strings.HasPrefix(authHeader, "Bearer ") {
+		raw, ok := bearerOrQueryToken(ctx)
+		if !ok {
+			if raw == "" {
+				response := utils.BuildResponseFailed(dto.MESSAGE_FAILED_PROSES_REQUEST, dto.MESSAGE_FAILED_TOKEN_NOT_FOUND, nil)
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, response)
+				return
+			}
 			response := utils.BuildResponseFailed(dto.MESSAGE_FAILED_PROSES_REQUEST, dto.MESSAGE_FAILED_TOKEN_NOT_VALID, nil)
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response)
 			return
 		}
 
-		raw := strings.TrimPrefix(authHeader, "Bearer ")
 		claims, err := verifier.Verify(raw)
 		if err != nil {
 			response := utils.BuildResponseFailed(dto.MESSAGE_FAILED_PROSES_REQUEST, dto.MESSAGE_FAILED_TOKEN_NOT_VALID, nil)
@@ -46,4 +43,17 @@ func Authenticate(verifier jwks.Verifier) gin.HandlerFunc {
 		ctx.Set("role", claims.Role)
 		ctx.Next()
 	}
+}
+
+func bearerOrQueryToken(ctx *gin.Context) (raw string, ok bool) {
+	authHeader := ctx.GetHeader("Authorization")
+	if authHeader == "" {
+		raw = ctx.Query("token")
+		return raw, raw != ""
+	}
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return authHeader, false
+	}
+	raw = strings.TrimPrefix(authHeader, "Bearer ")
+	return raw, raw != ""
 }

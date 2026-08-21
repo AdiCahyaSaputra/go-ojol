@@ -18,14 +18,12 @@ const (
 type Transaction struct {
 	ID uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
 
-	CustomerID uuid.UUID `gorm:"type:uuid;not null" json:"customer_id"`
-	Customer   Customer  `gorm:"foreignKey:CustomerID;references:ID;constraint:OnDelete:SET NULL" json:"customer"`
-
-	DriverID uuid.UUID `gorm:"type:uuid;not null" json:"driver_id"`
-	Driver   Driver    `gorm:"foreignKey:DriverID;references:ID;constraint:OnDelete:SET NULL" json:"driver"`
-
-	VehicleID uuid.UUID `gorm:"type:uuid;not null" json:"vehicle_id"`
-	Vehicle   Vehicle   `gorm:"foreignKey:VehicleID;references:ID;constraint:OnDelete:SET NULL" json:"vehicle"`
+	CustomerID *uuid.UUID `gorm:"type:uuid" json:"customer_id"`
+	Customer   *Customer  `gorm:"foreignKey:CustomerID;references:ID;constraint:OnDelete:SET NULL" json:"customer"`
+	DriverID   *uuid.UUID `gorm:"type:uuid" json:"driver_id"`
+	Driver     *Driver    `gorm:"foreignKey:DriverID;references:ID;constraint:OnDelete:SET NULL" json:"driver"`
+	VehicleID  *uuid.UUID `gorm:"type:uuid" json:"vehicle_id"`
+	Vehicle    *Vehicle   `gorm:"foreignKey:VehicleID;references:ID;constraint:OnDelete:SET NULL" json:"vehicle"`
 
 	PickupLatLong      pq.StringArray `gorm:"type:varchar(40)[];not null" json:"pickup_lat_long"`
 	DestinationLatLong pq.StringArray `gorm:"type:varchar(40)[];not null" json:"destination_lat_long"`

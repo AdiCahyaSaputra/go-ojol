@@ -8,10 +8,14 @@ import (
 	dispatchController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/controller"
 	dispatchRepository "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/repository"
 	dispatchService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/service"
+	dispatchwsController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatchws/controller"
+	dispatchwsService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatchws/service"
 	tripController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/controller"
 	pkgcasbin "github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/casbin"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/drivergeo"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
+	"github.com/redis/go-redis/v9"
 	"github.com/samber/do"
 	"gorm.io/gorm"
 )
@@ -22,8 +26,15 @@ func InitDatabase(injector *do.Injector) {
 	})
 }
 
+func InitRedis(injector *do.Injector) {
+	do.ProvideNamed(injector, constants.Redis, func(i *do.Injector) (*redis.Client, error) {
+		return config.SetUpRedis(), nil
+	})
+}
+
 func RegisterDependencies(injector *do.Injector) {
 	InitDatabase(injector)
+	InitRedis(injector)
 
 	do.ProvideNamed(injector, constants.JWKSVerifier, func(i *do.Injector) (jwks.Verifier, error) {
 		return jwks.NewVerifierFromEnv()
@@ -39,15 +50,24 @@ func RegisterDependencies(injector *do.Injector) {
 	})
 
 	db := do.MustInvokeNamed[*gorm.DB](injector, constants.DB)
+	rdb := do.MustInvokeNamed[*redis.Client](injector, constants.Redis)
+	locations := drivergeo.NewStore(rdb)
+
 	dispatchRepo := dispatchRepository.NewDispatchRepository(db)
 	dispatchSvc := dispatchService.NewDispatchService(
 		dispatchRepo,
 		db,
 		&http.Client{Timeout: 10 * time.Second},
 		"",
+		locations,
 	)
 
 	do.Provide(injector, func(i *do.Injector) (dispatchController.DispatchController, error) {
 		return dispatchController.NewDispatchController(i, dispatchSvc), nil
+	})
+
+	wsSvc := dispatchwsService.NewDispatchWSService(locations)
+	do.Provide(injector, func(i *do.Injector) (dispatchwsController.DispatchWSController, error) {
+		return dispatchwsController.NewDispatchWSController(wsSvc), nil
 	})
 }

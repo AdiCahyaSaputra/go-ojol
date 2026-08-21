@@ -17,4 +17,5 @@ const (
 	DB             = "db"
 	JWKSVerifier   = "JWKSVerifier"
 	CasbinEnforcer = "CasbinEnforcer"
+	Redis          = "redis"
 )

@@ -17,6 +17,8 @@ Ride-hailing backend (`go-ojol`): three Go/Gin services behind a reverse-proxy g
 | Authorization | Casbin RBAC (`sub, obj, act`) |
 | Validation | `go-playground/validator` |
 | Live reload | Air |
+| Realtime | WebSocket (`GET /api/trip/dispatch/ws`) |
+| Live tracking | Redis geo (`drivers:standby`) |
 
 ### Product targets (not in this repo yet)
 
@@ -26,8 +28,6 @@ Ride-hailing backend (`go-ojol`): three Go/Gin services behind a reverse-proxy g
 | Location | Expo Location |
 | Routing | OSRM |
 | Geocoding | Photon (self-hostable) |
-| Realtime | WebSocket |
-| Cache / live tracking | Redis |
 | Payment | Midtrans / dummy |
 | Push | Expo Notifications |
 | Client | Expo |
@@ -45,6 +45,7 @@ flowchart LR
 
   Auth --> AuthDB[("PostgreSQL")]
   Trip --> TripDB[("PostgreSQL")]
+  Trip --> Redis[("Redis geo")]
   Trip -.->|"GET JWKS"| Auth
 ```
 
@@ -56,7 +57,7 @@ Each service reads its own `DB_*` env, but Auth and Trip shared one Postgres. Au
 |---|---|---|
 | Gateway | `backend/gateway` | Path-based reverse proxy. No database. |
 | Auth | `backend/auth` | Register / login, JWKS, user CRUD, Casbin. |
-| Trip | `backend/trip` | Downstream consumer of Auth JWTs. Protected probe endpoint today; trip domain APIs next. |
+| Trip | `backend/trip` | Downstream consumer of Auth JWTs. Fare quotes, nearby-driver lookup, driver standby WebSocket. |
 
 Default listen address is `GOLANG_PORT` (fallback `8888`). On `APP_ENV=localhost` the bind host is `0.0.0.0`.
 
@@ -86,11 +87,27 @@ The proxy uses `Rewrite` (`SetURL` + `SetXForwarded`) so the original path, meth
 | `PUT` | `/api/user/:id` | JWT + Casbin `user:update` (uses token `user_id`, not `:id`) |
 | `DELETE` | `/api/user/:id` | JWT + Casbin `user:delete` (uses token `user_id`, not `:id`) |
 
-**Trip** (`backend/trip/modules/trip/routes.go`)
+**Trip** (`backend/trip/modules/trip/routes.go`, `backend/trip/modules/dispatch/routes.go`, `backend/trip/modules/dispatchws/routes.go`)
 
 | Method | Path | Guard |
 |---|---|---|
-| `GET` | `/api/trip/protected` | JWT via JWKS verifier |
+| `GET` | `/api/trip/protected` | JWT + Casbin `trip:read` |
+| `POST` | `/api/trip/dispatch/calculate-argo` | JWT + Casbin `trip:create` |
+| `GET` | `/api/trip/dispatch/find-driver` | JWT + Casbin `trip:read` |
+| `GET` | `/api/trip/dispatch/ws` | JWT + Casbin `trip:update` (WebSocket upgrade) |
+
+`find-driver` takes `current_location` as repeated query params (`lat`, `lng`) and returns nearby standby members from Redis. Members are JWT `user_id` values until driver-table integration.
+
+Driver standby WebSocket (`GET /api/trip/dispatch/ws`): Bearer header or `?token=`. One connection per user; a new connect closes the previous. Messages:
+
+```json
+{"type":"standby","lat":-6.2088,"lng":106.8456}
+{"type":"location","lat":-6.2089,"lng":106.8457}
+```
+
+Server replies `{"type":"standby_ok"}` or `{"type":"error","message":"..."}`. Disconnect removes the geo member.
+
+Redis key: `drivers:standby` (`GEOADD` / `GEORADIUS` / `ZREM`). Default search radius is 3 km, count 10.
 
 ## Clean architecture
 
@@ -145,7 +162,7 @@ flowchart TB
 
 Auth DI (`backend/auth/providers/core.go`): Postgres → JWT service → Casbin enforcer → user/casbin repositories → user/auth services → controllers.
 
-Trip DI (`backend/trip/providers/core.go`): Postgres → JWKS verifier → trip controller.
+Trip DI (`backend/trip/providers/core.go`): Postgres → Redis → JWKS verifier → Casbin enforcer → trip / dispatch / dispatchws controllers.
 
 ## Authentication
 
@@ -163,7 +180,7 @@ Access token claims:
 
 The public JWK is served at `GET /.well-known/jwks.json`. Trip (`AUTH_JWKS_URL`) caches keys for 5 minutes, then verifies `alg=ES256`, `kid`, and `iss` before putting `user_id`, `email`, and `role` on the Gin context.
 
-Refresh-token helpers exist on the JWT service (7-day opaque token) but login currently returns only `access_token` and `role`. Refresh and password-reset DTOs have no routes. Logout is a no-op and is not behind `Authenticate`. Casbin runs in Auth only; Trip does not enforce policies.
+Refresh-token helpers exist on the JWT service (7-day opaque token) but login currently returns only `access_token` and `role`. Refresh and password-reset DTOs have no routes. Logout is a no-op and is not behind `Authenticate`. Trip enforces Casbin the same way Auth does: `Authenticate` then `Authorize(enforcer, resource, action)` using the email from the token. WebSocket handshakes also accept `?token=` when `Authorization` is absent.
 
 ```mermaid
 sequenceDiagram
@@ -196,7 +213,7 @@ g, <user_email>, <role>
 
 Matcher: `g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act`.
 
-Roles: `admin`, `customer`, `driver`. Seeded user policies today are on resource `user` with actions `read` / `update` / `delete`. Register writes `g, <email>, <customer|driver>` in the same transaction as the user row, then reloads the enforcer.
+Roles: `admin`, `customer`, `driver`. Policies on `user` (`read` / `update` / `delete`) and `trip` (`create` / `read` / `update` / `delete`). Customer dispatch uses `trip:create` (calculate-argo) and `trip:read` (find-driver). Driver standby WebSocket uses `trip:update`. Register writes `g, <email>, <customer|driver>` in the same transaction as the user row, then reloads the enforcer.
 
 Policies live in `casbin_rules` via a GORM Casbin adapter. Seed JSON:
 
@@ -205,7 +222,7 @@ Policies live in `casbin_rules` via a GORM Casbin adapter. Seed JSON:
 
 CLI: `go run cmd/main.go --script:casbin_seed` (no extra flags). When adding a `casbin_*` resource (e.g. `casbin_trip`), update the script **and** both JSON files.
 
-Auth middleware chain on `/api/user`: `Authenticate(jwt)` then `Authorize(enforcer, resource, action)` using the email from the token.
+Auth middleware chain on `/api/user`: `Authenticate(jwt)` then `Authorize(enforcer, resource, action)` using the email from the token. Trip dispatch routes use the same pattern against the shared `casbin_rules` table.
 
 ## Request envelopes
 
@@ -409,5 +426,8 @@ make migrate-rollback
 | `AUTH_SERVICE_URL` | gateway | Auth upstream |
 | `TRIP_SERVICE_URL` | gateway | Trip upstream |
 | `AUTH_JWKS_URL` | trip | Full JWKS URL (typically `http://<auth>/.well-known/jwks.json`) |
+| `REDIS_ADDR` | trip | Redis host:port (default `localhost:6379`) |
+| `REDIS_PASSWORD` | trip | Optional Redis password |
+| `REDIS_DB` | trip | Redis logical DB (default `0`) |
 
 Each service loads `.env` via `godotenv`. Dockerfiles under `backend/<service>/docker` run Air for development; there is no repo-root compose file yet.

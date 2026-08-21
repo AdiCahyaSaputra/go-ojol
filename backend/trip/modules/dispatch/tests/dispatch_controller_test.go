@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -17,9 +18,12 @@ import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/controller"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/service"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/drivergeo"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/redis/go-redis/v9"
 	"github.com/samber/do"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -172,6 +176,70 @@ func TestCalculateArgo_DeniesWhenUnauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
+func TestFindDriver_EmptyList(t *testing.T) {
+	router, sign := newFindDriverRouter(t, true, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/trip/dispatch/find-driver?current_location=-6.2088&current_location=106.8456", nil)
+	req.Header.Set("Authorization", "Bearer "+sign("user-1", "user@example.com", "customer"))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body struct {
+		Status  bool   `json:"status"`
+		Message string `json:"message"`
+		Data    struct {
+			Drivers []struct {
+				UserID    string     `json:"user_id"`
+				DistanceM int        `json:"distance_m"`
+				Location  [2]float64 `json:"location"`
+			} `json:"drivers"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.True(t, body.Status)
+	assert.Empty(t, body.Data.Drivers)
+}
+
+func TestFindDriver_ReturnsNearby(t *testing.T) {
+	router, sign, store := newFindDriverRouterWithStore(t, true)
+	require.NoError(t, store.SetStandby(context.Background(), "drv-1", -6.2088, 106.8456))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/trip/dispatch/find-driver?current_location=-6.2088&current_location=106.8456", nil)
+	req.Header.Set("Authorization", "Bearer "+sign("user-1", "user@example.com", "customer"))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body struct {
+		Status bool `json:"status"`
+		Data   struct {
+			Drivers []struct {
+				UserID    string     `json:"user_id"`
+				DistanceM int        `json:"distance_m"`
+				Location  [2]float64 `json:"location"`
+			} `json:"drivers"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Len(t, body.Data.Drivers, 1)
+	assert.Equal(t, "drv-1", body.Data.Drivers[0].UserID)
+	assert.Equal(t, 0, body.Data.Drivers[0].DistanceM)
+}
+
+func TestFindDriver_DeniesWhenUnauthorized(t *testing.T) {
+	router, sign := newFindDriverRouter(t, false, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/trip/dispatch/find-driver?current_location=-6.2088&current_location=106.8456", nil)
+	req.Header.Set("Authorization", "Bearer "+sign("user-1", "drv@example.com", "driver"))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
 func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler, allow bool) (*gin.Engine, func(userID, email, role string) string) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -204,7 +272,7 @@ func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler, allow bool) 
 		return &gorm.DB{}, nil
 	})
 
-	dispatchSvc := service.NewDispatchService(nil, nil, osrmServer.Client(), osrmServer.URL)
+	dispatchSvc := service.NewDispatchService(nil, nil, osrmServer.Client(), osrmServer.URL, nil)
 	dispatchCtrl := controller.NewDispatchController(injector, dispatchSvc)
 	verifier := jwks.NewVerifier(jwksServer.URL, "go-ojol-auth")
 
@@ -232,6 +300,88 @@ func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler, allow bool) 
 	}
 
 	return router, sign
+}
+
+func newFindDriverRouter(t *testing.T, allow bool, store *drivergeo.Store) (*gin.Engine, func(userID, email, role string) string) {
+	t.Helper()
+	router, sign, _ := newFindDriverRouterWithStoreAndAllow(t, allow, store)
+	return router, sign
+}
+
+func newFindDriverRouterWithStore(t *testing.T, allow bool) (*gin.Engine, func(userID, email, role string) string, *drivergeo.Store) {
+	t.Helper()
+	mr := miniredis.RunT(t)
+	store := drivergeo.NewStore(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+	router, sign, _ := newFindDriverRouterWithStoreAndAllow(t, allow, store)
+	return router, sign, store
+}
+
+func newFindDriverRouterWithStoreAndAllow(
+	t *testing.T,
+	allow bool,
+	store *drivergeo.Store,
+) (*gin.Engine, func(userID, email, role string) string, *drivergeo.Store) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+
+	if store == nil {
+		mr := miniredis.RunT(t)
+		store = drivergeo.NewStore(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+	}
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	kid := "test-kid"
+	jwksBody := jwks.JWKS{Keys: []jwks.JWK{{
+		Kty: "EC",
+		Crv: "P-256",
+		X:   base64.RawURLEncoding.EncodeToString(key.PublicKey.X.FillBytes(make([]byte, 32))),
+		Y:   base64.RawURLEncoding.EncodeToString(key.PublicKey.Y.FillBytes(make([]byte, 32))),
+		Use: "sig",
+		Alg: "ES256",
+		Kid: kid,
+	}}}
+
+	jwksServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(jwksBody)
+	}))
+	t.Cleanup(jwksServer.Close)
+
+	injector := do.New()
+	do.ProvideNamed(injector, constants.DB, func(i *do.Injector) (*gorm.DB, error) {
+		return &gorm.DB{}, nil
+	})
+
+	dispatchSvc := service.NewDispatchService(nil, nil, nil, "", store)
+	dispatchCtrl := controller.NewDispatchController(injector, dispatchSvc)
+	verifier := jwks.NewVerifier(jwksServer.URL, "go-ojol-auth")
+
+	router := gin.New()
+	router.GET(
+		"/api/trip/dispatch/find-driver",
+		middlewares.Authenticate(verifier),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_READ),
+		dispatchCtrl.FindDriver,
+	)
+
+	sign := func(userID, email, role string) string {
+		token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
+			"user_id": userID,
+			"email":   email,
+			"role":    role,
+			"iss":     "go-ojol-auth",
+			"exp":     time.Now().Add(time.Minute).Unix(),
+			"iat":     time.Now().Unix(),
+		})
+		token.Header["kid"] = kid
+		raw, err := token.SignedString(key)
+		require.NoError(t, err)
+		return raw
+	}
+
+	return router, sign, store
 }
 
 type stubEnforcer struct {

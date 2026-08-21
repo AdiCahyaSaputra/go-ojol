@@ -28,9 +28,6 @@ test-dir:
 	@if [ -z "$(dir)" ]; then echo "Usage: make test-dir dir=<dir_path>"; exit 1; fi
 	go test -v $(dir)
 
-test-jwks:
-	go test -v ./pkg/jwks/...
-
 test-dispatch:
 	go test -v ./modules/dispatch/tests/...
 
@@ -43,6 +40,28 @@ test-all:
 test-coverage:
 	go test -v -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out
+
+test-case:
+	@if [ -z "$(module)" ] || [ -z "$(case)" ]; then \
+		echo "Usage: make test-case module=<module_name> case=<feature_case>"; exit 1; fi
+	@test -d modules/$(module) || (echo "module '$(module)' not found under modules/"; exit 1)
+	@mkdir -p modules/$(module)/tests
+	@test ! -f modules/$(module)/tests/$(case)_test.go || (echo "modules/$(module)/tests/$(case)_test.go already exists"; exit 1)
+	@pascal=$$(echo "$(case)" | awk -F_ '{for(i=1;i<=NF;i++){$$i=toupper(substr($$i,1,1)) substr($$i,2)}}1' OFS=); \
+	printf '%s\n' \
+		'package tests' \
+		'' \
+		'import (' \
+		'	"testing"' \
+		'' \
+		'	"github.com/stretchr/testify/assert"' \
+		')' \
+		'' \
+		"func Test$${pascal}_Placeholder(t *testing.T) {" \
+		'	assert.True(t, true)' \
+		'}' \
+		> modules/$(module)/tests/$(case)_test.go
+	@echo "created modules/$(module)/tests/$(case)_test.go"
 
 module:
 	@if [ -z "$(name)" ]; then echo "Usage: make module name=<module_name>"; exit 1; fi

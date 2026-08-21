@@ -20,7 +20,7 @@ func TestFindDriver_EmptyList(t *testing.T) {
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/api/trip/dispatch/find-driver?current_location=-6.2088&current_location=106.8456&VehicleType=motorcycle",
+		"/api/trip/dispatch/customer/find-driver?current_location=-6.2088&current_location=106.8456&VehicleType=motorcycle",
 		nil,
 	)
 	req.Header.Set("Authorization", "Bearer "+sign("user-1", "user@example.com", "customer"))
@@ -51,7 +51,7 @@ func TestFindDriver_ReturnsNearby(t *testing.T) {
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/api/trip/dispatch/find-driver?current_location=-6.2088&current_location=106.8456&VehicleType=motorcycle",
+		"/api/trip/dispatch/customer/find-driver?current_location=-6.2088&current_location=106.8456&VehicleType=motorcycle",
 		nil,
 	)
 	req.Header.Set("Authorization", "Bearer "+sign("user-1", "user@example.com", "customer"))
@@ -81,7 +81,7 @@ func TestFindDriver_DeniesWhenUnauthorized(t *testing.T) {
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/api/trip/dispatch/find-driver?current_location=-6.2088&current_location=106.8456&VehicleType=motorcycle",
+		"/api/trip/dispatch/customer/find-driver?current_location=-6.2088&current_location=106.8456&VehicleType=motorcycle",
 		nil,
 	)
 	req.Header.Set("Authorization", "Bearer "+sign("user-1", "drv@example.com", "driver"))

@@ -21,7 +21,7 @@ import (
 func TestCalculateArgo_RequiresBearer(t *testing.T) {
 	router, _ := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -31,7 +31,7 @@ func TestCalculateArgo_RequiresBearer(t *testing.T) {
 func TestCalculateArgo_RejectsInvalidToken(t *testing.T) {
 	router, _ := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{}`))
 	req.Header.Set("Authorization", "Bearer not-a-token")
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -44,7 +44,7 @@ func TestCalculateArgo_RejectsInvalidBody(t *testing.T) {
 	router, sign := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
 	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{
+	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{
 		"pickup_loc": ["1000", "106.8456"],
 		"destination": ["-6.1754", "106.8272"],
 		"vehicle_id": "`+vehicle.ID.String()+`"
@@ -75,7 +75,7 @@ func TestCalculateArgo_ReturnsQuote(t *testing.T) {
 	router, sign := newCalculateArgoRouter(t, osrm, true)
 	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{
+	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{
 		"pickup_loc": ["-6.2088", "106.8456"],
 		"destination": ["-6.1754", "106.8272"],
 		"vehicle_id": "`+vehicle.ID.String()+`"
@@ -117,7 +117,7 @@ func TestCalculateArgo_NoRouteIsBadRequest(t *testing.T) {
 	router, sign := newCalculateArgoRouter(t, osrm, true)
 	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{
+	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{
 		"pickup_loc": ["-6.2088", "106.8456"],
 		"destination": ["-6.1754", "106.8272"],
 		"vehicle_id": "`+vehicle.ID.String()+`"
@@ -137,7 +137,7 @@ func TestCalculateArgo_OSRMDownIsBadGateway(t *testing.T) {
 	router, sign := newCalculateArgoRouter(t, osrm, true)
 	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{
+	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{
 		"pickup_loc": ["-6.2088", "106.8456"],
 		"destination": ["-6.1754", "106.8272"],
 		"vehicle_id": "`+vehicle.ID.String()+`"
@@ -154,7 +154,7 @@ func TestCalculateArgo_DeniesWhenUnauthorized(t *testing.T) {
 	router, sign := newCalculateArgoRouter(t, http.NotFoundHandler(), false)
 	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/calculate-argo", bytes.NewBufferString(`{
+	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{
 		"pickup_loc": ["-6.2088", "106.8456"],
 		"destination": ["-6.1754", "106.8272"],
 		"vehicle_id": "`+vehicle.ID.String()+`"

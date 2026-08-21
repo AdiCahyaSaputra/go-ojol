@@ -48,17 +48,26 @@ func (s *Store) Nearby(ctx context.Context, lat, lng float64, radiusKm float64, 
 		count = DefaultCount
 	}
 
-	locations, err := s.rdb.GeoSearchLocation(ctx, KeyStandby, &redis.GeoSearchLocationQuery{
+	q := &redis.GeoSearchLocationQuery{
 		GeoSearchQuery: redis.GeoSearchQuery{
-			Longitude: lng,
-			Latitude:  lat,
-			Count:     count,
-			Radius:    radiusKm,
-			Sort:      "ASC",
+			Longitude:  lng,
+			Latitude:   lat,
+			Count:      count,
+			Radius:     radiusKm,
+			RadiusUnit: "km",
+			Sort:       "ASC",
 		},
 		WithDist:  true,
 		WithCoord: true,
-	}).Result()
+	}
+
+	// go-redis v9.18–v9.22 GeoSearchLocation() duplicates query args
+	// (https://github.com/redis/go-redis/pull/3955). Build once via the ctor.
+	cmd := redis.NewGeoSearchLocationCmd(ctx, q, "geosearch", KeyStandby)
+	if err := s.rdb.Process(ctx, cmd); err != nil {
+		return nil, err
+	}
+	locations, err := cmd.Result()
 	if err != nil {
 		return nil, err
 	}

@@ -76,7 +76,7 @@ func TestServeWS_StandbyThenFindDriver(t *testing.T) {
 	customer := sign("cst-1", "cst@example.com", "customer")
 	req, err := http.NewRequest(
 		http.MethodGet,
-		server.URL+"/api/trip/dispatch/find-driver?current_location=-6.2088&current_location=106.8456&VehicleType=motorcycle",
+		server.URL+"/api/trip/dispatch/customer/find-driver?current_location=-6.2088&current_location=106.8456&VehicleType=motorcycle",
 		nil,
 	)
 	require.NoError(t, err)
@@ -223,9 +223,9 @@ func newDispatchWSServer(t *testing.T, allow bool) (*httptest.Server, func(userI
 		wsCtrl.ServeWS,
 	)
 	router.GET(
-		"/api/trip/dispatch/find-driver",
+		"/api/trip/dispatch/customer/find-driver",
 		middlewares.Authenticate(verifier),
-		middlewares.Authorize(&stubEnforcer{allow: true}, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_READ),
+		middlewares.Authorize(&stubEnforcer{allow: true}, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),
 		dispatchCtrl.FindDriver,
 	)
 

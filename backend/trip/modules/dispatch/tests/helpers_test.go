@@ -162,9 +162,9 @@ func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler, allow bool) 
 
 	router := gin.New()
 	router.POST(
-		"/api/trip/dispatch/calculate-argo",
+		"/api/trip/dispatch/customer/calculate-argo",
 		middlewares.Authenticate(verifier),
-		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_CREATE),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_CREATE),
 		injectCustomer(),
 		dispatchCtrl.CalculateArgo,
 	)
@@ -205,10 +205,35 @@ func newFindDriverRouterWithStoreAndAllow(
 
 	router := gin.New()
 	router.GET(
-		"/api/trip/dispatch/find-driver",
+		"/api/trip/dispatch/customer/find-driver",
 		middlewares.Authenticate(verifier),
-		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_READ),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),
 		dispatchCtrl.FindDriver,
+	)
+
+	return router, sign, store
+}
+
+func newSetDriverModeRouter(t *testing.T, allow bool, store *drivergeo.Store) (*gin.Engine, func(userID, email, role string) string, *drivergeo.Store) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+
+	if store == nil {
+		store = newGeoStore(t)
+	}
+
+	verifier, sign := newTestSigner(t)
+	injector := newTestInjector(t)
+
+	dispatchSvc := service.NewDispatchService(nil, nil, nil, "", store)
+	dispatchCtrl := controller.NewDispatchController(injector, dispatchSvc)
+
+	router := gin.New()
+	router.POST(
+		"/api/trip/dispatch/driver/mode",
+		middlewares.Authenticate(verifier),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_UPDATE),
+		dispatchCtrl.SetDriverMode,
 	)
 
 	return router, sign, store

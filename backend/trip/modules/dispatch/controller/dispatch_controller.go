@@ -18,8 +18,12 @@ import (
 
 type (
 	DispatchController interface {
+		// Customer
 		CalculateArgo(ctx *gin.Context)
 		FindDriver(ctx *gin.Context)
+
+		// Driver
+		SetDriverMode(ctx *gin.Context)
 	}
 
 	dispatchController struct {
@@ -87,7 +91,7 @@ func (c *dispatchController) FindDriver(ctx *gin.Context) {
 	}
 
 	if err := c.dispatchValidation.ValidateRequest(req); err != nil {
-		res := utils.BuildResponseFailed("Validation failed", err.Error(), nil)
+		res := utils.BuildResponseFailed("Validation failed", err, nil)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}
@@ -105,5 +109,39 @@ func (c *dispatchController) FindDriver(ctx *gin.Context) {
 	}
 
 	res := utils.BuildResponseSuccess(dto.MESSAGE_SUCCESS_FIND_DRIVER, result)
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (c *dispatchController) SetDriverMode(ctx *gin.Context) {
+	var req dto.SetDriverModeRequest
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_GET_DATA_FROM_BODY, err.Error(), nil)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+
+	if err := c.dispatchValidation.ValidateRequest(req); err != nil {
+		res := utils.BuildResponseFailed("Validation failed", err, nil)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+
+	reqCtx := context.WithValue(
+		ctx.Request.Context(),
+		"user_id",
+		(ctx.MustGet("user_id")).(string),
+	)
+
+	err := c.dispatchService.SetDriverMode(reqCtx, req)
+	if err != nil {
+		status := http.StatusInternalServerError
+
+		res := utils.BuildResponseFailed(dto.MESSAGE_SET_DRIVER_MODE_FAILED, err.Error(), nil)
+		ctx.JSON(status, res)
+		return
+	}
+
+	res := utils.BuildResponseSuccess(dto.MESSAGE_SET_DRIVER_MODE_SUCCESS, gin.H{})
 	ctx.JSON(http.StatusOK, res)
 }

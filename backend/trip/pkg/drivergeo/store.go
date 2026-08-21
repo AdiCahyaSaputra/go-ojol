@@ -28,15 +28,15 @@ func NewStore(rdb *redis.Client) *Store {
 	return &Store{rdb: rdb}
 }
 
-func (s *Store) SetStandby(ctx context.Context, userID string, lat, lng float64) error {
+func (s *Store) SetStandby(ctx context.Context, userId string, lat, lng float64) error {
 	return s.rdb.GeoAdd(ctx, KeyStandby, &redis.GeoLocation{
-		Name:      userID,
+		Name:      userId,
 		Longitude: lng,
 		Latitude:  lat,
 	}).Err()
 }
 
-func (s *Store) Remove(ctx context.Context, userID string) error {
+func (s *Store) RemoveStandby(ctx context.Context, userID string) error {
 	return s.rdb.ZRem(ctx, KeyStandby, userID).Err()
 }
 
@@ -67,7 +67,7 @@ func (s *Store) Nearby(ctx context.Context, lat, lng float64, radiusKm float64, 
 	for _, loc := range locations {
 		drivers = append(drivers, NearbyDriver{
 			UserID:    loc.Name,
-			DistanceM: int(math.Round(loc.Dist * 1000)), 
+			DistanceM: int(math.Round(loc.Dist * 1000)),
 			Lat:       loc.Latitude,
 			Lng:       loc.Longitude,
 		})

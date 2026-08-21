@@ -40,7 +40,7 @@ func (s *dispatchWSService) HandleConn(userID string, conn *websocket.Conn) {
 
 	defer func() {
 		if s.unregister(userID, conn) && s.locations != nil {
-			_ = s.locations.Remove(context.Background(), userID)
+			_ = s.locations.RemoveStandby(context.Background(), userID)
 		}
 		_ = conn.Close()
 	}()
@@ -89,22 +89,22 @@ func (s *dispatchWSService) HandleConn(userID string, conn *websocket.Conn) {
 		switch msg.Type {
 		case dto.TypeStandby, dto.TypeLocation:
 			if !validLatLng(msg.Lat, msg.Lng) {
-				_ = writeJSON(dto.ServerMessage{Type: dto.TypeError, Message: "invalid lat lng"})
+				_ = writeJSON(dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_INVALID_LAT_LONG})
 				continue
 			}
 			if s.locations == nil {
-				_ = writeJSON(dto.ServerMessage{Type: dto.TypeError, Message: "location store unavailable"})
+				_ = writeJSON(dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_LOCATION_STORE_UNAVAILABLE})
 				continue
 			}
 			if err := s.locations.SetStandby(context.Background(), userID, msg.Lat, msg.Lng); err != nil {
-				_ = writeJSON(dto.ServerMessage{Type: dto.TypeError, Message: "failed to save location"})
+				_ = writeJSON(dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_FAILED_SAVE_LOC})
 				continue
 			}
 			if msg.Type == dto.TypeStandby {
 				_ = writeJSON(dto.ServerMessage{Type: dto.TypeStandbyOK})
 			}
 		default:
-			_ = writeJSON(dto.ServerMessage{Type: dto.TypeError, Message: "unknown message type"})
+			_ = writeJSON(dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_UNKNOWN_MESSAGE_TYPE})
 		}
 	}
 }

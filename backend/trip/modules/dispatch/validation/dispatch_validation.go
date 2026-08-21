@@ -4,6 +4,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/database/entities"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/dto"
 	validation "github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/validation"
 )
 
@@ -17,6 +18,10 @@ func NewDispatchValidation() *DispatchValidation {
 	validate.RegisterValidation("vehicle_type", validation.Enum(
 		entities.VehicleTypeCar,
 		entities.VehicleTypeMotorcycle,
+	))
+	validate.RegisterValidation("driver_mode", validation.Enum(
+		dto.DriverModeOnline,
+		dto.DriverModeOffline,
 	))
 
 	return &DispatchValidation{

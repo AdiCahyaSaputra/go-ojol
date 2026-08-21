@@ -6,11 +6,20 @@ import (
 	"strings"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/database/entities"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/dto"
 	"github.com/go-playground/validator/v10"
 )
 
 func joinEnumStrings(enumStrings ...string) string {
 	return strings.Join(enumStrings, ", ")
+}
+
+func oneOfEnum(field string, choices ...string) string {
+	return fmt.Sprintf(
+		"%s should be one of %s",
+		field,
+		joinEnumStrings(choices...),
+	)
 }
 
 func ParseValidationError(err any) map[string]string {
@@ -43,13 +52,14 @@ func ParseValidationError(err any) map[string]string {
 			case "latlong":
 				errorsMap[field] = fmt.Sprintf("%s must a valid [latitude, longitude] value", fieldErr.Field())
 			case "vehicle_type":
-				errorsMap[field] = fmt.Sprintf(
-					"%s should be one of %s",
-					fieldErr.Field(),
-					joinEnumStrings(
-						string(entities.VehicleTypeCar),
-						string(entities.VehicleTypeMotorcycle),
-					),
+				errorsMap[field] = oneOfEnum(
+					string(entities.VehicleTypeCar),
+					string(entities.VehicleTypeMotorcycle),
+				)
+			case "driver_mode":
+				errorsMap[field] = oneOfEnum(
+					string(dto.DriverModeOnline),
+					string(dto.DriverModeOffline),
 				)
 			default:
 				errorsMap[field] = fmt.Sprintf("%s failed validation: %s", fieldErr.Field(), tag)

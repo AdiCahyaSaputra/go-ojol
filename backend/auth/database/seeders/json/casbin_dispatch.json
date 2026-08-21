@@ -1,0 +1,50 @@
+[
+	{
+		"ptype": "p",
+		"v0": "customer",
+		"v1": "dispatch",
+		"v2": "create"
+	},
+	{
+		"ptype": "p",
+		"v0": "customer",
+		"v1": "dispatch",
+		"v2": "read"
+	},
+	{
+		"ptype": "p",
+		"v0": "customer",
+		"v1": "dispatch",
+		"v2": "update"
+	},
+	{
+		"ptype": "p",
+		"v0": "customer",
+		"v1": "dispatch",
+		"v2": "delete"
+	},
+	{
+		"ptype": "p",
+		"v0": "driver",
+		"v1": "dispatch",
+		"v2": "create"
+	},
+	{
+		"ptype": "p",
+		"v0": "driver",
+		"v1": "dispatch",
+		"v2": "read"
+	},
+	{
+		"ptype": "p",
+		"v0": "driver",
+		"v1": "dispatch",
+		"v2": "update"
+	},
+	{
+		"ptype": "p",
+		"v0": "driver",
+		"v1": "dispatch",
+		"v2": "delete"
+	}
+]

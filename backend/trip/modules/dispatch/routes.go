@@ -20,23 +20,37 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 
 	authenticate := middlewares.Authenticate(verifier)
 
-	dispatchRoutes := server.Group(constants.ROUTE_GROUP + "/dispatch")
+	dispatchCustomerRoutes := server.Group(constants.ROUTE_GROUP + "/dispatch/customer")
 	{
-		dispatchRoutes.POST("/calculate-argo", 
-			authenticate, 
+		dispatchCustomerRoutes.POST("/calculate-argo",
+			authenticate,
 			middlewares.ResolveProfileId(db), // customer_id lookup
 			middlewares.Authorize(
 				enforcer,
-				constants.ENUM_RESOURCE_TRIP,
+				constants.ENUM_RESOURCE_DISPATCH,
 				constants.ENUM_ACTION_CREATE,
-			), 
+			),
 			dispatchController.CalculateArgo,
 		)
 
-		dispatchRoutes.GET("/find-driver", authenticate, middlewares.Authorize(
+		dispatchCustomerRoutes.GET("/find-driver", authenticate, middlewares.Authorize(
 			enforcer,
-			constants.ENUM_RESOURCE_TRIP,
+			constants.ENUM_RESOURCE_DISPATCH,
 			constants.ENUM_ACTION_READ,
 		), dispatchController.FindDriver)
+	}
+
+	dispatchDriverRoutes := server.Group(constants.ROUTE_GROUP + "/dispatch/driver")
+	{
+		dispatchDriverRoutes.POST("/mode",
+			authenticate,
+			middlewares.ResolveProfileId(db), // customer_id lookup
+			middlewares.Authorize(
+				enforcer,
+				constants.ENUM_RESOURCE_DISPATCH,
+				constants.ENUM_ACTION_UPDATE,
+			),
+			dispatchController.SetDriverMode,
+		)
 	}
 }

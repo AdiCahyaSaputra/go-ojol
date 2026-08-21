@@ -38,8 +38,12 @@ var (
 )
 
 type DispatchService interface {
+	// Customer
 	CalculateArgo(ctx context.Context, req dto.CalculateArgoRequest) (dto.CalculateArgoResponse, error)
 	FindDriver(ctx context.Context, req dto.FindDriverRequest) (dto.FindDriverResponse, error)
+
+	// Driver
+	SetDriverMode(ctx context.Context, req dto.SetDriverModeRequest) error
 }
 
 type dispatchService struct {
@@ -222,6 +226,37 @@ func (s *dispatchService) getOSRMRoute(ctx context.Context, pickupLat, pickupLng
 	}
 
 	return parsed.Routes[0], nil
+}
+
+func (s dispatchService) SetDriverMode(ctx context.Context, req dto.SetDriverModeRequest) error {
+	userId := ctx.Value("user_id").(string)
+
+	if userId == "" {
+		return errors.New(dto.MESSAGE_DRIVE_USER_ID_CONTEXT_NOT_FOUND)
+	}
+
+	lat, long, err := parseLatLong(req.CurrentLatLong)
+
+	if err != nil {
+		return err
+	}
+
+	switch req.Mode {
+	case dto.DriverModeOnline:
+		err = s.locations.SetStandby(ctx, userId, lat, long)
+
+		if err != nil {
+			return err
+		}
+	case dto.DriverModeOffline:
+		err = s.locations.RemoveStandby(ctx, userId)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func parseLatLong(pair [2]string) (lat float64, lng float64, err error) {

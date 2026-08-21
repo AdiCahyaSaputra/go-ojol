@@ -18,6 +18,18 @@ const (
 
 	MESSAGE_SUCCESS_FIND_DRIVER = "success find driver"
 	MESSAGE_FAILED_FIND_DRIVER  = "failed find driver"
+
+	MESSAGE_DRIVE_MODE_INVALID              = "driver mode is invalid, avaliable mode is online or offline"
+	MESSAGE_DRIVE_USER_ID_CONTEXT_NOT_FOUND = "can't find user_id in driver context"
+	MESSAGE_SET_DRIVER_MODE_FAILED          = "set mode for driver failed"
+	MESSAGE_SET_DRIVER_MODE_SUCCESS         = "set mode for driver success"
+)
+
+type DriverMode string
+
+const (
+	DriverModeOnline  = "online"
+	DriverModeOffline = "offline"
 )
 
 type (
@@ -63,5 +75,10 @@ type (
 		FarePerDistance    int `json:"fare_per_distance"`
 		PlatformPercentage int `json:"platform_percentage"`
 		TotalFare          int `json:"total_fare"`
+	}
+
+	SetDriverModeRequest struct {
+		Mode           DriverMode `json:"mode" validate:"required,driver_mode"`
+		CurrentLatLong [2]string  `json:"current_lat_long" validate:"required,latlong"`
 	}
 )

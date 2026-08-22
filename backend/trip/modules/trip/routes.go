@@ -16,7 +16,7 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 	enforcer := do.MustInvokeNamed[pkgcasbin.Enforcer](injector, constants.CasbinEnforcer)
 
 	authenticate := middlewares.Authenticate(verifier)
-	tripRead := middlewares.Authorize(enforcer, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_READ)
+	tripRead := middlewares.Authorize(enforcer, "", constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_READ)
 
 	tripRoutes := server.Group(constants.ROUTE_GROUP)
 	{

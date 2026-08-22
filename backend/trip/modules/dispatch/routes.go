@@ -27,6 +27,7 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 			middlewares.ResolveProfileId(db), // customer_id lookup
 			middlewares.Authorize(
 				enforcer,
+				constants.ENUM_ROLE_CUSTOMER,
 				constants.ENUM_RESOURCE_DISPATCH,
 				constants.ENUM_ACTION_CREATE,
 			),
@@ -35,6 +36,7 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 
 		dispatchCustomerRoutes.POST("/find-driver", authenticate, middlewares.Authorize(
 			enforcer,
+			constants.ENUM_ROLE_CUSTOMER,
 			constants.ENUM_RESOURCE_DISPATCH,
 			constants.ENUM_ACTION_READ,
 		), dispatchController.FindDriver)
@@ -47,6 +49,7 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 			middlewares.ResolveProfileId(db), // customer_id lookup
 			middlewares.Authorize(
 				enforcer,
+				constants.ENUM_ROLE_DRIVER,
 				constants.ENUM_RESOURCE_DISPATCH,
 				constants.ENUM_ACTION_UPDATE,
 			),

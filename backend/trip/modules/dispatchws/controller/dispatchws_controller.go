@@ -55,7 +55,7 @@ func checkOrigin(r *http.Request) bool {
 	}
 
 	raw := os.Getenv("CORS_ALLOWED_ORIGINS")
-	for _, allowed := range strings.Split(raw, ",") {
+	for allowed := range strings.SplitSeq(raw, ",") {
 		if strings.TrimSpace(allowed) == origin {
 			return true
 		}

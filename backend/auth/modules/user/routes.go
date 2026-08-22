@@ -16,9 +16,9 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 	enforcer := do.MustInvokeNamed[pkgcasbin.Enforcer](injector, constants.CasbinEnforcer)
 
 	authenticate := middlewares.Authenticate(jwtService)
-	userRead := middlewares.Authorize(enforcer, constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_READ)
-	userUpdate := middlewares.Authorize(enforcer, constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_UPDATE)
-	userDelete := middlewares.Authorize(enforcer, constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_DELETE)
+	userRead := middlewares.Authorize(enforcer, "", constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_READ)
+	userUpdate := middlewares.Authorize(enforcer, "", constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_UPDATE)
+	userDelete := middlewares.Authorize(enforcer, constants.ENUM_ROLE_ADMIN, constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_DELETE)
 
 	userRoutes := server.Group(constants.ROUTE_GROUP + "/user")
 	{

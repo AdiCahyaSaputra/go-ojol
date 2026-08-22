@@ -16,7 +16,7 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 	enforcer := do.MustInvokeNamed[pkgcasbin.Enforcer](injector, constants.CasbinEnforcer)
 
 	authenticate := middlewares.Authenticate(verifier)
-	authorizeUpdate := middlewares.Authorize(enforcer, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_UPDATE)
+	authorizeUpdate := middlewares.Authorize(enforcer, constants.ENUM_ROLE_DRIVER, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_UPDATE)
 
 	dispatchRoutes := server.Group(constants.ROUTE_GROUP + "/dispatch")
 	{

@@ -41,6 +41,7 @@ type JWTService interface {
 	ValidateToken(token string) (*jwt.Token, error)
 	GetUserIDByToken(token string) (string, error)
 	GetEmailByToken(token string) (string, error)
+	GetRoleByToken(token string) (string, error)
 	JWKS() JWKS
 }
 
@@ -206,6 +207,10 @@ func (j *jwtService) GetUserIDByToken(token string) (string, error) {
 
 func (j *jwtService) GetEmailByToken(token string) (string, error) {
 	return j.claimByToken(token, "email")
+}
+
+func (j *jwtService) GetRoleByToken(token string) (string, error) {
+	return j.claimByToken(token, "role")
 }
 
 func (j *jwtService) claimByToken(token, key string) (string, error) {

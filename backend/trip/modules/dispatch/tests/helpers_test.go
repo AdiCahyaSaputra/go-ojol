@@ -176,7 +176,7 @@ func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler, allow bool) 
 	router.POST(
 		"/api/trip/dispatch/customer/calculate-argo",
 		middlewares.Authenticate(verifier),
-		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_CREATE),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_CREATE),
 		injectCustomer(),
 		dispatchCtrl.CalculateArgo,
 	)
@@ -223,7 +223,7 @@ func newFindDriverRouterWithStoreAndAllow(
 	router.POST(
 		"/api/trip/dispatch/customer/find-driver",
 		middlewares.Authenticate(verifier),
-		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),
 		dispatchCtrl.FindDriver,
 	)
 
@@ -248,7 +248,7 @@ func newSetDriverModeRouter(t *testing.T, allow bool, store *drivergeo.Store) (*
 	router.POST(
 		"/api/trip/dispatch/driver/mode",
 		middlewares.Authenticate(verifier),
-		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_UPDATE),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_ROLE_DRIVER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_UPDATE),
 		dispatchCtrl.SetDriverMode,
 	)
 

@@ -110,7 +110,7 @@ func newProtectedRouter(t *testing.T, allow bool) (*gin.Engine, func(userID, ema
 	router.GET(
 		"/api/trip/protected",
 		middlewares.Authenticate(verifier),
-		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_READ),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, "", constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_READ),
 		controller.NewTripController().Protected,
 	)
 

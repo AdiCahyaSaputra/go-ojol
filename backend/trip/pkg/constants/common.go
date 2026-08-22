@@ -7,6 +7,10 @@ const (
 	ENUM_PAGINATION_PER_PAGE = 10
 	ENUM_PAGINATION_PAGE     = 1
 
+	ENUM_ROLE_ADMIN    = "admin"
+	ENUM_ROLE_CUSTOMER = "customer"
+	ENUM_ROLE_DRIVER   = "driver"
+
 	ENUM_RESOURCE_TRIP     = "trip"
 	ENUM_RESOURCE_DISPATCH = "dispatch"
 

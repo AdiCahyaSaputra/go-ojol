@@ -219,13 +219,13 @@ func newDispatchWSServer(t *testing.T, allow bool) (*httptest.Server, func(userI
 	router.GET(
 		"/api/trip/dispatch/ws",
 		middlewares.Authenticate(verifier),
-		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_UPDATE),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_ROLE_DRIVER, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_UPDATE),
 		wsCtrl.ServeWS,
 	)
 	router.GET(
 		"/api/trip/dispatch/customer/find-driver",
 		middlewares.Authenticate(verifier),
-		middlewares.Authorize(&stubEnforcer{allow: true}, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),
+		middlewares.Authorize(&stubEnforcer{allow: true}, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),
 		dispatchCtrl.FindDriver,
 	)
 

@@ -11,6 +11,7 @@ import (
 
 type DispatchRepository interface {
 	VehicleById(id uuid.UUID) (*entities.Vehicle, error)
+	NearbyDriverProfiles(driverUserIds []uuid.UUID, vehicleType entities.VehicleType) (map[string]dto.NearbyDriverProfile, error)
 	PendingArgoTransaction(req dto.PendingArgoTransaction) error
 }
 
@@ -36,6 +37,42 @@ func (r *dispatchRepository) VehicleById(id uuid.UUID) (*entities.Vehicle, error
 	}
 
 	return vehicle, nil
+}
+
+func (r *dispatchRepository) NearbyDriverProfiles(driverUserIds []uuid.UUID, vehicleType entities.VehicleType) (map[string]dto.NearbyDriverProfile, error) {
+	driversProfileMap := map[string]dto.NearbyDriverProfile{}
+	var driversProfile []dto.NearbyDriverProfile
+
+	err := r.db.
+		Table("drivers d").
+		Select(`
+			d.id as driver_id,
+			d.user_id,
+			d.name,
+			d.phone_number,
+			d.profile_picture_url,
+			v.id as vehicle_id,
+			v.name as vehicle_name,
+			v.license_number,
+			v.max_size,
+			v.type
+		`).
+		Joins(`
+			join vehicles v
+			on d.vehicle_id = v.id
+		`).
+		Where("v.type = ? and d.user_id in ?", vehicleType, driverUserIds).
+		Scan(&driversProfile).Error
+
+	if err != nil {
+		return driversProfileMap, err
+	}
+
+	for _, driverProfile := range driversProfile {
+		driversProfileMap[driverProfile.UserID.String()] = driverProfile
+	}
+
+	return driversProfileMap, nil
 }
 
 func (r *dispatchRepository) PendingArgoTransaction(req dto.PendingArgoTransaction) error {

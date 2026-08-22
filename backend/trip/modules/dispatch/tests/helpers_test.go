@@ -42,9 +42,11 @@ func (s *stubEnforcer) LoadPolicy() error {
 }
 
 type stubDispatchRepo struct {
-	vehicle    *entities.Vehicle
-	vehicleErr error
-	pendingErr error
+	vehicle            *entities.Vehicle
+	vehicleErr         error
+	pendingErr         error
+	nearbyProfiles     map[string]dto.NearbyDriverProfile
+	nearbyProfilesErr  error
 }
 
 func (s *stubDispatchRepo) VehicleById(id uuid.UUID) (*entities.Vehicle, error) {
@@ -62,6 +64,16 @@ func (s *stubDispatchRepo) VehicleById(id uuid.UUID) (*entities.Vehicle, error) 
 
 func (s *stubDispatchRepo) PendingArgoTransaction(req dto.PendingArgoTransaction) error {
 	return s.pendingErr
+}
+
+func (s *stubDispatchRepo) NearbyDriverProfiles(_ []uuid.UUID, _ entities.VehicleType) (map[string]dto.NearbyDriverProfile, error) {
+	if s.nearbyProfilesErr != nil {
+		return nil, s.nearbyProfilesErr
+	}
+	if s.nearbyProfiles != nil {
+		return s.nearbyProfiles, nil
+	}
+	return map[string]dto.NearbyDriverProfile{}, nil
 }
 
 func testCustomer() entities.Customer {
@@ -174,14 +186,14 @@ func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler, allow bool) 
 
 func newFindDriverRouter(t *testing.T, allow bool, store *drivergeo.Store) (*gin.Engine, func(userID, email, role string) string) {
 	t.Helper()
-	router, sign, _ := newFindDriverRouterWithStoreAndAllow(t, allow, store)
+	router, sign, _ := newFindDriverRouterWithStoreAndAllow(t, allow, store, nil)
 	return router, sign
 }
 
 func newFindDriverRouterWithStore(t *testing.T, allow bool) (*gin.Engine, func(userID, email, role string) string, *drivergeo.Store) {
 	t.Helper()
 	store := newGeoStore(t)
-	router, sign, _ := newFindDriverRouterWithStoreAndAllow(t, allow, store)
+	router, sign, _ := newFindDriverRouterWithStoreAndAllow(t, allow, store, nil)
 	return router, sign, store
 }
 
@@ -189,6 +201,7 @@ func newFindDriverRouterWithStoreAndAllow(
 	t *testing.T,
 	allow bool,
 	store *drivergeo.Store,
+	repo *stubDispatchRepo,
 ) (*gin.Engine, func(userID, email, role string) string, *drivergeo.Store) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -196,15 +209,18 @@ func newFindDriverRouterWithStoreAndAllow(
 	if store == nil {
 		store = newGeoStore(t)
 	}
+	if repo == nil {
+		repo = &stubDispatchRepo{}
+	}
 
 	verifier, sign := newTestSigner(t)
 	injector := newTestInjector(t)
 
-	dispatchSvc := service.NewDispatchService(nil, nil, nil, "", store)
+	dispatchSvc := service.NewDispatchService(repo, nil, nil, "", store)
 	dispatchCtrl := controller.NewDispatchController(injector, dispatchSvc)
 
 	router := gin.New()
-	router.GET(
+	router.POST(
 		"/api/trip/dispatch/customer/find-driver",
 		middlewares.Authenticate(verifier),
 		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),

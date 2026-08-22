@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/database/entities"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/repository"
@@ -145,7 +147,7 @@ func (s *dispatchService) FindDriver(ctx context.Context, req dto.FindDriverRequ
 		return dto.FindDriverResponse{}, ErrLocationStore
 	}
 
-	lat, lng, err := parseLatLong(req.CurrentLocation)
+	lat, lng, err := parseLatLong(req.CurrentLatLong)
 	if err != nil {
 		return dto.FindDriverResponse{}, err
 	}
@@ -155,13 +157,28 @@ func (s *dispatchService) FindDriver(ctx context.Context, req dto.FindDriverRequ
 		return dto.FindDriverResponse{}, err
 	}
 
-	drivers := make([]dto.NearbyDriver, 0, len(nearby))
+	driverUserIds := make([]uuid.UUID, 0, len(nearby))
+
 	for _, driver := range nearby {
-		drivers = append(drivers, dto.NearbyDriver{
-			UserID:    driver.UserID,
-			DistanceM: driver.DistanceM,
-			Location:  [2]float64{driver.Lat, driver.Lng},
-		})
+		driverUserIds = append(driverUserIds, uuid.MustParse(driver.UserID))
+	}
+
+	nearbyDriverProfiles, err := s.dispatchRepository.NearbyDriverProfiles(driverUserIds, req.VehicleType)
+
+	if err != nil {
+		return dto.FindDriverResponse{}, err
+	}
+
+	drivers := make([]dto.NearbyDriver, 0, len(nearby))
+
+	for _, driver := range nearby {
+		if driverProfile, ok := nearbyDriverProfiles[driver.UserID]; ok {
+			drivers = append(drivers, dto.NearbyDriver{
+				DistanceM: driver.DistanceM,
+				Location:  [2]float64{driver.Lat, driver.Lng},
+				Profile:   driverProfile,
+			})
+		}
 	}
 
 	return dto.FindDriverResponse{Drivers: drivers}, nil

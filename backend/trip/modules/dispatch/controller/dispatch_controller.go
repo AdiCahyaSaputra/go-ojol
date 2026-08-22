@@ -84,7 +84,7 @@ func (c *dispatchController) CalculateArgo(ctx *gin.Context) {
 
 func (c *dispatchController) FindDriver(ctx *gin.Context) {
 	var req dto.FindDriverRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_GET_DATA_FROM_BODY, err.Error(), nil)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return

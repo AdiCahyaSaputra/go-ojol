@@ -33,7 +33,7 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 			dispatchController.CalculateArgo,
 		)
 
-		dispatchCustomerRoutes.GET("/find-driver", authenticate, middlewares.Authorize(
+		dispatchCustomerRoutes.POST("/find-driver", authenticate, middlewares.Authorize(
 			enforcer,
 			constants.ENUM_RESOURCE_DISPATCH,
 			constants.ENUM_ACTION_READ,

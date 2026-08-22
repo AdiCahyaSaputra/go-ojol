@@ -49,18 +49,32 @@ type (
 	}
 
 	FindDriverRequest struct {
-		CurrentLocation [2]string            `json:"current_location" form:"current_location" binding:"required,len=2" validate:"required,latlong"`
-		VehicleType     entities.VehicleType `json:"vehicle_type" binding:"required" validate:"required,vehicle_type"`
+		CurrentLatLong [2]string            `json:"current_lat_long" form:"current_location" binding:"required,len=2" validate:"required,latlong"`
+		VehicleType    entities.VehicleType `json:"vehicle_type" binding:"required" validate:"required,vehicle_type"`
 	}
 
 	FindDriverResponse struct {
 		Drivers []NearbyDriver `json:"drivers"`
 	}
 
+	NearbyDriverProfile struct {
+		UserID            uuid.UUID            `json:"user_id"`
+		DriverID          uuid.UUID            `json:"driver_id"`
+		Name              string               `json:"name"`
+		PhoneNumber       string               `json:"phone_number"`
+		ProfilePictureUrl *string              `json:"profile_picture_url"`
+		VehicleID         uuid.UUID            `json:"vehicle_id"`
+		VehicleName       string               `json:"vehicle_name"`
+		LicenseNumber     string               `json:"license_number"`
+		MaxSize           int                  `json:"max_size"`
+		Type              entities.VehicleType `json:"type"`
+	}
+
 	NearbyDriver struct {
-		UserID    string     `json:"user_id"`
-		DistanceM int        `json:"distance_m"`
-		Location  [2]float64 `json:"location"`
+		UserID    string              `json:"user_id"`
+		DistanceM int                 `json:"distance_m"`
+		Location  [2]float64          `json:"location"`
+		Profile   NearbyDriverProfile `json:"profile"`
 	}
 
 	PendingArgoTransaction struct {

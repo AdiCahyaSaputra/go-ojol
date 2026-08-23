@@ -1,0 +1,23 @@
+###
+POST {{base_url}}/api/auth/login HTTP/2.0
+Content-Type: application/json
+Accept: application/json
+
+{
+	"email": "cst.adics@gmail.com",
+	"password": "hehe1234",
+}
+###
+
+###
+POST {{base_url}}/api/trip/dispatch/calculate-argo HTTP/2.0
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{bearer_token}}
+
+{
+	"pickup_loc": ["-6.2088", "106.8456"],
+	"destination": ["-6.1754", "106.8272"],
+	"vehicle_type": "car"
+}
+###

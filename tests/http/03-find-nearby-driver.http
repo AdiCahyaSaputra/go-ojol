@@ -1,0 +1,29 @@
+###
+POST {{base_url}}/api/auth/login HTTP/2.0
+Content-Type: application/json
+Accept: application/json
+
+{
+	"email": "cst.adics@gmail.com",
+	"password": "hehe1234",
+}
+
+> {%
+  const data = response.body.data;
+  client.global.set("bearer_token", data.access_token);
+  client.global.set("refresh_token", data.refresh_token);
+  client.log("tokens stored");
+%}
+###
+
+###
+POST {{base_url}}/api/trip/dispatch/customer/find-driver HTTP/2.0
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{bearer_token}}
+
+{
+	"current_lat_long": ["-6.105900", "106.814500"],
+	"vehicle_type": "motorcycle",
+}
+###

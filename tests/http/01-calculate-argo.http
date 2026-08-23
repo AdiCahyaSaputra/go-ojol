@@ -1,0 +1,31 @@
+###
+POST {{base_url}}/api/auth/login HTTP/2.0
+Content-Type: application/json
+Accept: application/json
+
+{
+	"email": "cst.adics@gmail.com",
+	"password": "hehe1234",
+}
+
+> {%
+  const data = response.body.data;
+  client.global.set("bearer_token", data.access_token);
+  client.global.set("refresh_token", data.refresh_token);
+  client.log("tokens stored");
+%}
+###
+
+###
+POST {{base_url}}/api/trip/dispatch/customer/calculate-argo HTTP/2.0
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{bearer_token}}
+
+{
+	"pickup_loc": ["-6.2088", "106.8456"],
+	"destination": ["-6.1754", "106.8272"],
+	"vehicle_id": "5bd64683-675b-4de7-ade3-e380e129c820"
+}
+###
+

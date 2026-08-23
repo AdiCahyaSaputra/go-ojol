@@ -1,0 +1,230 @@
+# Multi-device sessions + refresh (auth)
+
+### LOGIN_DEVICE_A
+POST {{base_url}}/api/auth/login HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+User-Agent: go-ojol-http-tests/device-a
+
+{
+	"email": "{{auth_email}}",
+	"password": "{{auth_password}}"
+}
+
+> {%
+  const data = response.body.data;
+  client.global.set("access_a", data.access_token);
+  client.global.set("refresh_a", data.refresh_token);
+  client.log("device A tokens stored");
+%}
+
+###
+
+### LOGIN_DEVICE_B
+POST {{base_url}}/api/auth/login HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+User-Agent: go-ojol-http-tests/device-b
+
+{
+	"email": "{{auth_email}}",
+	"password": "{{auth_password}}"
+}
+
+> {%
+  const data = response.body.data;
+  client.global.set("access_b", data.access_token);
+  client.global.set("refresh_b", data.refresh_token);
+  client.log("device B tokens stored");
+%}
+
+###
+
+### LIST_SESSIONS
+# Expect two (or more) sessions; picks a non-current id for revoke
+GET {{base_url}}/api/auth/sessions HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{access_a}}
+
+> {%
+  const sessions = response.body.data;
+  let sessionIdToRevoke = null;
+  for (const session of sessions) {
+    if (!session.is_current) {
+      sessionIdToRevoke = session.id;
+      break;
+    }
+  }
+  client.assert(sessionIdToRevoke !== null, "no other session to revoke");
+  client.global.set("session_id_to_revoke", sessionIdToRevoke);
+  client.log("session_id_to_revoke=" + sessionIdToRevoke);
+%}
+
+###
+
+### REFRESH_ROTATE
+# Rotate device A refresh; keeps prior refresh in refresh_a_old for the next negative case
+POST {{base_url}}/api/auth/refresh HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+
+{
+	"refresh_token": "{{refresh_a}}"
+}
+
+> {%
+  const data = response.body.data;
+  client.global.set("refresh_a_old", client.global.get("refresh_a"));
+  client.global.set("access_a", data.access_token);
+  client.global.set("refresh_a", data.refresh_token);
+  client.log("device A tokens rotated");
+%}
+
+###
+
+### REFRESH_OLD_SHOULD_FAIL
+# Expect 401 — pre-rotate refresh is invalid
+POST {{base_url}}/api/auth/refresh HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+
+{
+	"refresh_token": "{{refresh_a_old}}"
+}
+
+> {%
+  client.assert(response.status === 401, "expected 401 for rotated refresh token");
+%}
+
+###
+
+### LIST_SESSIONS_AFTER_REFRESH
+GET {{base_url}}/api/auth/sessions HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{access_a}}
+
+> {%
+  client.assert(response.status === 200, "expected 200 after refresh");
+%}
+
+###
+
+### REVOKE_OTHER_SESSION
+# Revoke device B from device A (session_id_to_revoke set by LIST_SESSIONS)
+DELETE {{base_url}}/api/auth/sessions/{{session_id_to_revoke}} HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{access_a}}
+
+> {%
+  client.assert(response.status === 200, "expected 200 when revoking other session");
+%}
+
+###
+
+### REVOKED_DEVICE_ACCESS_SHOULD_FAIL
+# Expect 401 — device B access JWT not expired but session revoked
+GET {{base_url}}/api/auth/sessions HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{access_b}}
+
+> {%
+  client.assert(response.status === 401, "expected 401 for revoked session access token");
+%}
+
+###
+
+### REVOKED_DEVICE_REFRESH_SHOULD_FAIL
+# Expect 401
+POST {{base_url}}/api/auth/refresh HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+
+{
+	"refresh_token": "{{refresh_b}}"
+}
+
+> {%
+  client.assert(response.status === 401, "expected 401 for revoked session refresh token");
+%}
+
+###
+
+### LOGOUT_CURRENT
+POST {{base_url}}/api/auth/logout HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{access_a}}
+
+> {%
+  client.assert(response.status === 200, "expected 200 on logout");
+%}
+
+###
+
+### AFTER_LOGOUT_ACCESS_SHOULD_FAIL
+# Expect 401
+GET {{base_url}}/api/auth/sessions HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{access_a}}
+
+> {%
+  client.assert(response.status === 401, "expected 401 after logout");
+%}
+
+###
+
+### LOGIN_FOR_LOGOUT_ALL
+POST {{base_url}}/api/auth/login HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+User-Agent: go-ojol-http-tests/logout-all-1
+
+{
+	"email": "{{auth_email}}",
+	"password": "{{auth_password}}"
+}
+
+> {%
+  client.global.set("access_logout_all", response.body.data.access_token);
+%}
+
+###
+
+### LOGIN_SECOND_FOR_LOGOUT_ALL
+POST {{base_url}}/api/auth/login HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+User-Agent: go-ojol-http-tests/logout-all-2
+
+{
+	"email": "{{auth_email}}",
+	"password": "{{auth_password}}"
+}
+
+> {%
+  client.global.set("access_logout_all_other", response.body.data.access_token);
+%}
+
+###
+
+### LOGOUT_ALL
+POST {{base_url}}/api/auth/logout-all HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{access_logout_all}}
+
+> {%
+  client.assert(response.status === 200, "expected 200 on logout-all");
+%}
+
+###
+
+### AFTER_LOGOUT_ALL_OTHER_DEVICE_SHOULD_FAIL
+# Expect 401
+GET {{base_url}}/api/auth/sessions HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{access_logout_all_other}}
+
+> {%
+  client.assert(response.status === 401, "expected 401 after logout-all");
+%}
+
+###

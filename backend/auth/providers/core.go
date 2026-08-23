@@ -10,6 +10,7 @@ import (
 	userService "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/service"
 	pkgcasbin "github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/casbin"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/constants"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/uploadthing"
 	"github.com/samber/do"
 	"gorm.io/gorm"
 )
@@ -39,8 +40,13 @@ func RegisterDependencies(injector *do.Injector) {
 	userRepository := repository.NewUserRepository(db)
 	casbinRepository := casbinrepo.NewCasbinRepository(db)
 
+	uploadClient, err := uploadthing.NewClientFromEnv()
+	if err != nil {
+		panic(err)
+	}
+
 	userService := userService.NewUserService(userRepository, db)
-	authService := authService.NewAuthService(userRepository, casbinRepository, jwtService, enforcer, db)
+	authService := authService.NewAuthService(userRepository, casbinRepository, jwtService, enforcer, uploadClient, db)
 
 	do.Provide(
 		injector, func(i *do.Injector) (userController.UserController, error) {

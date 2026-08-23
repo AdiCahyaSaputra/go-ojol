@@ -106,3 +106,33 @@ func TestAuthValidation_ValidateRegisterRequest_RejectsMissingRole(t *testing.T)
 
 	assert.Error(t, err)
 }
+
+func TestAuthValidation_ValidateRegisterRequest_DriverRequiresVehicleFields(t *testing.T) {
+	authValidation := validation.NewAuthValidation()
+
+	req := userDto.UserCreateRequest{
+		Email:    "driver@example.com",
+		Password: "password123",
+		Role:     "driver",
+	}
+
+	err := authValidation.ValidateRegisterRequest(req)
+	assert.Error(t, err)
+}
+
+func TestAuthValidation_ValidateRegisterRequest_DriverWithVehicleSuccess(t *testing.T) {
+	authValidation := validation.NewAuthValidation()
+
+	req := userDto.UserCreateRequest{
+		Email:                "driver@example.com",
+		Password:             "password123",
+		Role:                 "driver",
+		VehicleName:          "Honda Beat",
+		VehicleLicenseNumber: "B 1001 XYZ",
+		VehicleMaxSize:       1,
+		VehicleType:          "motorcycle",
+	}
+
+	err := authValidation.ValidateRegisterRequest(req)
+	assert.NoError(t, err)
+}

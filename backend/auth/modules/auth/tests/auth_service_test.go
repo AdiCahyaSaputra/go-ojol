@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/database/entities"
@@ -14,6 +15,7 @@ import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/helpers"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
@@ -31,6 +33,13 @@ func (s *stubEnforcer) Enforce(rvals ...interface{}) (bool, error) {
 func (s *stubEnforcer) LoadPolicy() error {
 	s.loadPolicyCalled = true
 	return nil
+}
+
+type stubUploadClient struct{}
+
+func (s *stubUploadClient) Upload(ctx context.Context, filename, contentType string, size int64, body io.Reader) (string, error) {
+	_, _ = io.Copy(io.Discard, body)
+	return "https://example.com/" + filename, nil
 }
 
 func setupAuthTestDB(t *testing.T) *gorm.DB {
@@ -61,8 +70,53 @@ func setupAuthTestDB(t *testing.T) *gorm.DB {
 			updated_at DATETIME
 		)
 	`).Error)
+	require.NoError(t, db.Exec(`
+		CREATE TABLE vehicles (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			license_number TEXT NOT NULL,
+			max_size INTEGER NOT NULL,
+			type TEXT NOT NULL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)
+	`).Error)
+	require.NoError(t, db.Exec(`
+		CREATE TABLE customers (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			phone_number TEXT NOT NULL,
+			profile_picture_url TEXT,
+			created_at DATETIME,
+			updated_at DATETIME
+		)
+	`).Error)
+	require.NoError(t, db.Exec(`
+		CREATE TABLE drivers (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			vehicle_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			phone_number TEXT NOT NULL,
+			address TEXT NOT NULL,
+			profile_picture_url TEXT,
+			created_at DATETIME,
+			updated_at DATETIME
+		)
+	`).Error)
 
 	return db
+}
+
+func seedVehicle(t *testing.T, db *gorm.DB) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	require.NoError(t, db.Exec(
+		`INSERT INTO vehicles (id, name, license_number, max_size, type) VALUES (?, ?, ?, ?, ?)`,
+		id.String(), "Test Bike", "B1234XYZ", 2, "motorcycle",
+	).Error)
+	return id
 }
 
 func newAuthServiceForTest(t *testing.T, db *gorm.DB, enforcer *stubEnforcer) service.AuthService {
@@ -74,6 +128,7 @@ func newAuthServiceForTest(t *testing.T, db *gorm.DB, enforcer *stubEnforcer) se
 		casbinrepo.NewCasbinRepository(db),
 		jwtService,
 		enforcer,
+		&stubUploadClient{},
 		db,
 	)
 }
@@ -88,10 +143,13 @@ func TestAuthService_Register_CreatesGroupingByEmail(t *testing.T) {
 		Email:    "ada@example.com",
 		Password: "password123",
 		Role:     constants.ENUM_ROLE_CUSTOMER,
+		Name:     "Ada",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "ada@example.com", result.Email)
 	assert.Equal(t, constants.ENUM_ROLE_CUSTOMER, result.Role)
+	require.NotNil(t, result.Customer)
+	assert.Equal(t, "Ada", result.Customer.Name)
 	assert.True(t, enforcer.loadPolicyCalled)
 
 	var rule entities.CasbinRule
@@ -105,12 +163,66 @@ func TestAuthService_Register_DriverRole(t *testing.T) {
 	svc := newAuthServiceForTest(t, db, &stubEnforcer{})
 
 	result, err := svc.Register(context.Background(), userDto.UserCreateRequest{
+		Email:                "bob@example.com",
+		Password:             "password123",
+		Role:                 constants.ENUM_ROLE_DRIVER,
+		Name:                 "Bob",
+		VehicleName:          "Honda Beat",
+		VehicleLicenseNumber: "B 1001 XYZ",
+		VehicleMaxSize:       1,
+		VehicleType:          string(entities.VehicleTypeMotorcycle),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, constants.ENUM_ROLE_DRIVER, result.Role)
+	require.NotNil(t, result.Driver)
+	assert.Equal(t, "Bob", result.Driver.Name)
+	assert.Nil(t, result.Driver.Vehicle)
+
+	var vehicle entities.Vehicle
+	err = db.Where("license_number = ?", "B 1001 XYZ").First(&vehicle).Error
+	require.NoError(t, err)
+	assert.Equal(t, "Honda Beat", vehicle.Name)
+	assert.Equal(t, 1, vehicle.MaxSize)
+	assert.Equal(t, entities.VehicleTypeMotorcycle, vehicle.Type)
+
+	var driver entities.Driver
+	err = db.Where("user_id = ?", result.ID).First(&driver).Error
+	require.NoError(t, err)
+	assert.Equal(t, vehicle.ID, driver.VehicleID)
+}
+
+func TestAuthService_Register_DriverRequiresVehicle(t *testing.T) {
+	db := setupAuthTestDB(t)
+	svc := newAuthServiceForTest(t, db, &stubEnforcer{})
+
+	_, err := svc.Register(context.Background(), userDto.UserCreateRequest{
 		Email:    "bob@example.com",
 		Password: "password123",
 		Role:     constants.ENUM_ROLE_DRIVER,
 	})
-	require.NoError(t, err)
-	assert.Equal(t, constants.ENUM_ROLE_DRIVER, result.Role)
+	assert.ErrorIs(t, err, userDto.ErrVehicleRequired)
+}
+
+func TestAuthService_Register_DriverDuplicateLicense(t *testing.T) {
+	db := setupAuthTestDB(t)
+	seedVehicle(t, db)
+	svc := newAuthServiceForTest(t, db, &stubEnforcer{})
+
+	_, err := svc.Register(context.Background(), userDto.UserCreateRequest{
+		Email:                "bob@example.com",
+		Password:             "password123",
+		Role:                 constants.ENUM_ROLE_DRIVER,
+		Name:                 "Bob",
+		VehicleName:          "Other Bike",
+		VehicleLicenseNumber: "B1234XYZ",
+		VehicleMaxSize:       2,
+		VehicleType:          string(entities.VehicleTypeMotorcycle),
+	})
+	assert.ErrorIs(t, err, userDto.ErrLicenseNumberExists)
+
+	var userCount int64
+	require.NoError(t, db.Model(&entities.User{}).Where("email = ?", "bob@example.com").Count(&userCount).Error)
+	assert.Equal(t, int64(0), userCount)
 }
 
 func TestAuthService_Register_RejectsAdminRole(t *testing.T) {
@@ -133,6 +245,7 @@ func TestAuthService_Login_UsesGroupingRoleAndEmail(t *testing.T) {
 		casbinrepo.NewCasbinRepository(db),
 		jwtService,
 		&stubEnforcer{},
+		&stubUploadClient{},
 		db,
 	)
 	ctx := context.Background()

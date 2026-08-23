@@ -5,6 +5,7 @@ import (
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/repository"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -58,6 +59,15 @@ func (s *userService) GetUserById(ctx context.Context, userId string) (dto.UserR
 			PhoneNumber:       user.Driver.PhoneNumber,
 			Address:           user.Driver.Address,
 			ProfilePictureUrl: user.Driver.ProfilePictureUrl,
+		}
+		if user.Driver.Vehicle.ID != uuid.Nil && user.Driver.Vehicle.ID == user.Driver.VehicleID {
+			resp.Driver.Vehicle = &dto.VehicleProfileResponse{
+				ID:            user.Driver.Vehicle.ID.String(),
+				Name:          user.Driver.Vehicle.Name,
+				LicenseNumber: user.Driver.Vehicle.LicenseNumber,
+				MaxSize:       user.Driver.Vehicle.MaxSize,
+				Type:          string(user.Driver.Vehicle.Type),
+			}
 		}
 	}
 

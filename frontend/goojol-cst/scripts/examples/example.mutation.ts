@@ -1,6 +1,6 @@
-import { useMutation } from "@tanstack/react-query";
-import type { ExampleSchema } from "./example.schema";
-import { exampleService } from "./example.service";
+import { useMutation } from '@tanstack/react-query';
+import type { ExampleSchema } from './example.schema';
+import { exampleService } from './example.service';
 
 export const useExampleMutation = () => {
   return useMutation({
@@ -8,7 +8,7 @@ export const useExampleMutation = () => {
       return exampleService(data);
     },
     onSuccess: () => {
-      console.log("Example created successfully");
+      console.log('Example created successfully');
     },
   });
 };

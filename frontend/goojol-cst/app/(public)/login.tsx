@@ -3,7 +3,7 @@ import LoginPage from '@/feature/login/components/login-page';
 
 const Login = () => {
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-goojol-sky">
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#0F1729' }}>
       <LoginPage />
     </SafeAreaView>
   );

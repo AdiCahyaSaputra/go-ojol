@@ -1,7 +1,6 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-export const exampleSchema = z.object({
-});
+export const exampleSchema = z.object({});
 
 export type ExampleSchema = z.infer<typeof exampleSchema>;
 

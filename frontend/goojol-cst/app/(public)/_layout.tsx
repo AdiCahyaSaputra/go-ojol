@@ -10,7 +10,8 @@ const PublicLayout = () => {
           contentStyle: {
             backgroundColor: '#0F1729',
           },
-          animation: 'fade',
+          animation: 'slide_from_right',
+					animationTypeForReplace: 'pop'
         }}
       />
     </View>

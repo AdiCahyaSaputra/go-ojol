@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,7 +29,7 @@ function toPascalCase(str: string): string {
 
 function toSingular(str: string): string {
   if (str.endsWith('s')) return str.slice(0, -1);
-  if (str.endsWith('y')) return str.slice(0, -1) + 'y';
+  if (str.endsWith('y')) return `${str.slice(0, -1)}y`;
   return str;
 }
 
@@ -80,22 +80,24 @@ function replaceContent(content: string, name: string): string {
   const pluralKebab = toSingular(kebabName);
   const pluralPascal = toSingular(pascalName);
 
-  return content
-    // Replace plural forms first to avoid partial replacements
-    .replace(/examples/g, pluralKebab)
-    .replace(/Examples/g, pluralPascal)
-    // Replace singular forms
-    .replace(/example-/g, `${kebabName}-`)
-    .replace(/example\./g, `${kebabName}.`)
-    .replace(/example"/g, `${kebabName}"`)
-    .replace(/example]/g, `${kebabName}]`)
-    .replace(/example\)/g, `${kebabName})`)
-    .replace(/example\s/g, `${kebabName} `)
-    .replace(/Example([A-Z])/g, (_, next) => `${pascalName}${next}`)
-    .replace(/example([A-Z])/g, (_, next) => `${camelName}${next}`)
-    .replace(/Example\s/g, `${pascalName} `)
-    .replace(/Example$/g, pascalName)
-    .replace(/example$/g, camelName);
+  return (
+    content
+      // Replace plural forms first to avoid partial replacements
+      .replace(/examples/g, pluralKebab)
+      .replace(/Examples/g, pluralPascal)
+      // Replace singular forms
+      .replace(/example-/g, `${kebabName}-`)
+      .replace(/example\./g, `${kebabName}.`)
+      .replace(/example"/g, `${kebabName}"`)
+      .replace(/example]/g, `${kebabName}]`)
+      .replace(/example\)/g, `${kebabName})`)
+      .replace(/example\s/g, `${kebabName} `)
+      .replace(/Example([A-Z])/g, (_, next) => `${pascalName}${next}`)
+      .replace(/example([A-Z])/g, (_, next) => `${camelName}${next}`)
+      .replace(/Example\s/g, `${pascalName} `)
+      .replace(/Example$/g, pascalName)
+      .replace(/example$/g, camelName)
+  );
 }
 
 // Replace example in filename
@@ -109,7 +111,7 @@ function processDirectory(
   sourceDir: string,
   targetDir: string,
   name: string,
-  stats: { created: string[]; skipped: string[] }
+  stats: { created: string[]; skipped: string[] },
 ): void {
   // Create target directory if it doesn't exist
   if (!fs.existsSync(targetDir)) {
@@ -136,10 +138,10 @@ function processDirectory(
 
       // Read file content
       const content = fs.readFileSync(sourcePath, 'utf-8');
-      
+
       // Replace content
       const newContent = replaceContent(content, name);
-      
+
       // Write to target
       fs.writeFileSync(targetPath, newContent, 'utf-8');
       console.log(`✓ Created: ${targetPath}`);
@@ -162,7 +164,7 @@ function main() {
   // Define paths
   const rootDir = path.resolve(__dirname, '..');
   const examplesDir = path.join(rootDir, 'scripts', 'examples');
-  const featuresDir = path.join(rootDir, 'features');
+  const featuresDir = path.join(rootDir, 'feature');
   const targetDir = path.join(featuresDir, ...segments);
 
   // Check if examples directory exists
@@ -172,7 +174,7 @@ function main() {
   }
 
   const featureExists = fs.existsSync(targetDir);
-  
+
   console.log(`\n${featureExists ? 'Updating' : 'Generating'} feature: ${featurePath}`);
   console.log(`Source: ${examplesDir}`);
   console.log(`Target: ${targetDir}\n`);
@@ -184,28 +186,27 @@ function main() {
   processDirectory(examplesDir, targetDir, baseName, stats);
 
   console.log(`\n${featureExists ? '✅ Feature updated!' : '✅ Feature created successfully!'}\n`);
-  console.log(`Location: src/features/${featurePath}/\n`);
-  
+  console.log(`Location: feature/${featurePath}/\n`);
+
   if (stats.created.length > 0) {
     console.log(`✓ Created ${stats.created.length} file(s):`);
-    stats.created.forEach(file => {
-      const relativePath = file.replace(targetDir + '/', '');
+    stats.created.forEach((file) => {
+      const relativePath = file.replace(`${targetDir}/`, '');
       console.log(`  - ${relativePath}`);
     });
   }
-  
+
   if (stats.skipped.length > 0) {
     console.log(`\n⊘ Skipped ${stats.skipped.length} existing file(s):`);
-    stats.skipped.forEach(file => {
-      const relativePath = file.replace(targetDir + '/', '');
+    stats.skipped.forEach((file) => {
+      const relativePath = file.replace(`${targetDir}/`, '');
       console.log(`  - ${relativePath}`);
     });
   }
-  
+
   if (stats.created.length === 0 && stats.skipped.length === 0) {
     console.log('No files to process.');
   }
 }
 
 main();
-

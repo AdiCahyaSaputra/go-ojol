@@ -2,6 +2,7 @@ package user
 
 import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/middlewares"
+	authrepo "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/repository"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/service"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/controller"
 	pkgcasbin "github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/casbin"
@@ -13,9 +14,10 @@ import (
 func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 	userController := do.MustInvoke[controller.UserController](injector)
 	jwtService := do.MustInvokeNamed[service.JWTService](injector, constants.JWTService)
+	sessionRepo := do.MustInvoke[authrepo.SessionRepository](injector)
 	enforcer := do.MustInvokeNamed[pkgcasbin.Enforcer](injector, constants.CasbinEnforcer)
 
-	authenticate := middlewares.Authenticate(jwtService)
+	authenticate := middlewares.Authenticate(jwtService, sessionRepo)
 	userRead := middlewares.Authorize(enforcer, "", constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_READ)
 	userUpdate := middlewares.Authorize(enforcer, "", constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_UPDATE)
 	userDelete := middlewares.Authorize(enforcer, constants.ENUM_ROLE_ADMIN, constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_DELETE)

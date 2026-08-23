@@ -36,19 +36,21 @@ type JWKS struct {
 }
 
 type JWTService interface {
-	GenerateAccessToken(userId string, email string, role string) (string, error)
-	GenerateRefreshToken() (string, time.Time)
+	GenerateAccessToken(userId string, email string, role string, sessionId string) (string, error)
+	GenerateRefreshToken() (string, time.Time, error)
 	ValidateToken(token string) (*jwt.Token, error)
 	GetUserIDByToken(token string) (string, error)
 	GetEmailByToken(token string) (string, error)
 	GetRoleByToken(token string) (string, error)
+	GetSessionIDByToken(token string) (string, error)
 	JWKS() JWKS
 }
 
 type jwtCustomClaim struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
+	UserID    string `json:"user_id"`
+	Email     string `json:"email"`
+	Role      string `json:"role"`
+	SessionID string `json:"session_id"`
 	jwt.RegisteredClaims
 }
 
@@ -160,11 +162,12 @@ func jwkThumbprint(jwk JWK) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(sum[:]), nil
 }
 
-func (j *jwtService) GenerateAccessToken(userId string, email string, role string) (string, error) {
+func (j *jwtService) GenerateAccessToken(userId string, email string, role string, sessionId string) (string, error) {
 	claims := jwtCustomClaim{
-		UserID: userId,
-		Email:  email,
-		Role:   role,
+		UserID:    userId,
+		Email:     email,
+		Role:      role,
+		SessionID: sessionId,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.accessExpiry)),
 			Issuer:    j.issuer,
@@ -177,17 +180,16 @@ func (j *jwtService) GenerateAccessToken(userId string, email string, role strin
 	return token.SignedString(j.privateKey)
 }
 
-func (j *jwtService) GenerateRefreshToken() (string, time.Time) {
+func (j *jwtService) GenerateRefreshToken() (string, time.Time, error) {
 	b := make([]byte, 32)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", time.Time{}
+	if _, err := rand.Read(b); err != nil {
+		return "", time.Time{}, err
 	}
 
 	refreshToken := base64.StdEncoding.EncodeToString(b)
 	expiresAt := time.Now().Add(j.refreshExpiry)
 
-	return refreshToken, expiresAt
+	return refreshToken, expiresAt, nil
 }
 
 func (j *jwtService) parseToken(t_ *jwt.Token) (any, error) {
@@ -211,6 +213,10 @@ func (j *jwtService) GetEmailByToken(token string) (string, error) {
 
 func (j *jwtService) GetRoleByToken(token string) (string, error) {
 	return j.claimByToken(token, "role")
+}
+
+func (j *jwtService) GetSessionIDByToken(token string) (string, error) {
+	return j.claimByToken(token, "session_id")
 }
 
 func (j *jwtService) claimByToken(token, key string) (string, error) {

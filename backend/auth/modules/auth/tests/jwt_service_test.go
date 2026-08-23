@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/service"
 	"github.com/golang-jwt/jwt/v4"
@@ -31,7 +32,7 @@ func newTestJWTService(t *testing.T) (service.JWTService, *ecdsa.PrivateKey) {
 func TestJWTService_GenerateAndValidateAccessToken(t *testing.T) {
 	svc, _ := newTestJWTService(t)
 
-	token, err := svc.GenerateAccessToken("user-1", "admin@example.com", "admin")
+	token, err := svc.GenerateAccessToken("user-1", "admin@example.com", "admin", "session-1")
 	require.NoError(t, err)
 	require.NotEmpty(t, token)
 
@@ -46,12 +47,16 @@ func TestJWTService_GenerateAndValidateAccessToken(t *testing.T) {
 	email, err := svc.GetEmailByToken(token)
 	require.NoError(t, err)
 	assert.Equal(t, "admin@example.com", email)
+
+	sessionID, err := svc.GetSessionIDByToken(token)
+	require.NoError(t, err)
+	assert.Equal(t, "session-1", sessionID)
 }
 
 func TestJWTService_JWKSMatchesSignedHeader(t *testing.T) {
 	svc, _ := newTestJWTService(t)
 
-	token, err := svc.GenerateAccessToken("user-1", "user@example.com", "customer")
+	token, err := svc.GenerateAccessToken("user-1", "user@example.com", "customer", "session-1")
 	require.NoError(t, err)
 
 	jwks := svc.JWKS()
@@ -124,12 +129,21 @@ func TestNewJWTService_LoadsPEMFromPath(t *testing.T) {
 	require.Len(t, jwks.Keys, 1)
 	assert.Equal(t, "test-kid", jwks.Keys[0].Kid)
 
-	token, err := svc.GenerateAccessToken("user-1", "user@example.com", "customer")
+	token, err := svc.GenerateAccessToken("user-1", "user@example.com", "customer", "session-1")
 	require.NoError(t, err)
 
 	parsed, err := svc.ValidateToken(token)
 	require.NoError(t, err)
 	assert.True(t, parsed.Valid)
+}
+
+func TestJWTService_GenerateRefreshToken(t *testing.T) {
+	svc, _ := newTestJWTService(t)
+
+	token, expiresAt, err := svc.GenerateRefreshToken()
+	require.NoError(t, err)
+	assert.NotEmpty(t, token)
+	assert.True(t, expiresAt.After(time.Now()))
 }
 
 func TestNewJWTServiceFromKey_RejectsNonP256(t *testing.T) {

@@ -3,6 +3,7 @@ package providers
 import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/config"
 	authController "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/controller"
+	authrepo "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/repository"
 	authService "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/service"
 	casbinrepo "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/casbin/repository"
 	userController "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/controller"
@@ -39,6 +40,11 @@ func RegisterDependencies(injector *do.Injector) {
 
 	userRepository := repository.NewUserRepository(db)
 	casbinRepository := casbinrepo.NewCasbinRepository(db)
+	sessionRepository := authrepo.NewSessionRepository(db)
+
+	do.Provide(injector, func(i *do.Injector) (authrepo.SessionRepository, error) {
+		return sessionRepository, nil
+	})
 
 	uploadClient, err := uploadthing.NewClientFromEnv()
 	if err != nil {
@@ -46,7 +52,7 @@ func RegisterDependencies(injector *do.Injector) {
 	}
 
 	userService := userService.NewUserService(userRepository, db)
-	authService := authService.NewAuthService(userRepository, casbinRepository, jwtService, enforcer, uploadClient, db)
+	authSvc := authService.NewAuthService(userRepository, casbinRepository, sessionRepository, jwtService, enforcer, uploadClient, db)
 
 	do.Provide(
 		injector, func(i *do.Injector) (userController.UserController, error) {
@@ -56,7 +62,7 @@ func RegisterDependencies(injector *do.Injector) {
 
 	do.Provide(
 		injector, func(i *do.Injector) (authController.AuthController, error) {
-			return authController.NewAuthController(i, authService), nil
+			return authController.NewAuthController(i, authSvc), nil
 		},
 	)
 }

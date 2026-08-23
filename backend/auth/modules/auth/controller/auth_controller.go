@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/dto"
@@ -18,7 +19,11 @@ type (
 	AuthController interface {
 		Register(ctx *gin.Context)
 		Login(ctx *gin.Context)
+		Refresh(ctx *gin.Context)
 		Logout(ctx *gin.Context)
+		LogoutAll(ctx *gin.Context)
+		ListSessions(ctx *gin.Context)
+		RevokeSession(ctx *gin.Context)
 		JWKS(ctx *gin.Context)
 	}
 
@@ -83,7 +88,10 @@ func (c *authController) Login(ctx *gin.Context) {
 		return
 	}
 
-	result, err := c.authService.Login(ctx.Request.Context(), req)
+	result, err := c.authService.Login(ctx.Request.Context(), req, dto.LoginMeta{
+		UserAgent: ctx.GetHeader("User-Agent"),
+		IP:        ctx.ClientIP(),
+	})
 	if err != nil {
 		res := utils.BuildResponseFailed(userDto.MESSAGE_FAILED_LOGIN, err.Error(), nil)
 		ctx.JSON(http.StatusBadRequest, res)
@@ -94,15 +102,46 @@ func (c *authController) Login(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, res)
 }
 
+func (c *authController) Refresh(ctx *gin.Context) {
+	var req dto.RefreshTokenRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		res := utils.BuildResponseFailed(userDto.MESSAGE_FAILED_GET_DATA_FROM_BODY, err.Error(), nil)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+
+	if err := c.authValidation.ValidateRefreshTokenRequest(req); err != nil {
+		res := utils.BuildResponseFailed("Validation failed", err.Error(), nil)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+
+	result, err := c.authService.Refresh(ctx.Request.Context(), req)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, dto.ErrRefreshTokenNotFound) ||
+			errors.Is(err, dto.ErrRefreshTokenExpired) ||
+			errors.Is(err, dto.ErrSessionRevoked) {
+			status = http.StatusUnauthorized
+		}
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_REFRESH_TOKEN, err.Error(), nil)
+		ctx.JSON(status, res)
+		return
+	}
+
+	res := utils.BuildResponseSuccess(dto.MESSAGE_SUCCESS_REFRESH_TOKEN, result)
+	ctx.JSON(http.StatusOK, res)
+}
+
 func (c *authController) JWKS(ctx *gin.Context) {
 	ctx.Header("Cache-Control", "public, max-age=300")
 	ctx.JSON(http.StatusOK, c.jwtService.JWKS())
 }
 
 func (c *authController) Logout(ctx *gin.Context) {
-	userId := ctx.MustGet("user_id").(string)
+	sessionID := ctx.MustGet("session_id").(string)
 
-	err := c.authService.Logout(ctx.Request.Context(), userId)
+	err := c.authService.Logout(ctx.Request.Context(), sessionID)
 	if err != nil {
 		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_LOGOUT, err.Error(), nil)
 		ctx.JSON(http.StatusBadRequest, res)
@@ -110,5 +149,53 @@ func (c *authController) Logout(ctx *gin.Context) {
 	}
 
 	res := utils.BuildResponseSuccess(dto.MESSAGE_SUCCESS_LOGOUT, nil)
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (c *authController) LogoutAll(ctx *gin.Context) {
+	userID := ctx.MustGet("user_id").(string)
+
+	err := c.authService.LogoutAll(ctx.Request.Context(), userID)
+	if err != nil {
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_LOGOUT_ALL, err.Error(), nil)
+		ctx.JSON(http.StatusBadRequest, res)
+		return
+	}
+
+	res := utils.BuildResponseSuccess(dto.MESSAGE_SUCCESS_LOGOUT_ALL, nil)
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (c *authController) ListSessions(ctx *gin.Context) {
+	userID := ctx.MustGet("user_id").(string)
+	sessionID := ctx.MustGet("session_id").(string)
+
+	result, err := c.authService.ListSessions(ctx.Request.Context(), userID, sessionID)
+	if err != nil {
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_LIST_SESSIONS, err.Error(), nil)
+		ctx.JSON(http.StatusBadRequest, res)
+		return
+	}
+
+	res := utils.BuildResponseSuccess(dto.MESSAGE_SUCCESS_LIST_SESSIONS, result)
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (c *authController) RevokeSession(ctx *gin.Context) {
+	userID := ctx.MustGet("user_id").(string)
+	sessionID := ctx.Param("id")
+
+	err := c.authService.RevokeSession(ctx.Request.Context(), userID, sessionID)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, dto.ErrSessionNotFound) {
+			status = http.StatusNotFound
+		}
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_REVOKE_SESSION, err.Error(), nil)
+		ctx.JSON(status, res)
+		return
+	}
+
+	res := utils.BuildResponseSuccess(dto.MESSAGE_SUCCESS_REVOKE_SESSION, nil)
 	ctx.JSON(http.StatusOK, res)
 }

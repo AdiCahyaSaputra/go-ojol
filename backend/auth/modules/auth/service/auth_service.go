@@ -2,10 +2,14 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
+	"time"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/database/entities"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/dto"
+	authrepo "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/auth/repository"
 	casbinrepo "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/casbin/repository"
 	userDto "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/repository"
@@ -27,35 +31,55 @@ var allowedProfilePictureMIME = map[string]struct{}{
 
 type AuthService interface {
 	Register(ctx context.Context, req userDto.UserCreateRequest) (userDto.UserResponse, error)
-	Login(ctx context.Context, req userDto.UserLoginRequest) (dto.TokenResponse, error)
-	Logout(ctx context.Context, userId string) error
+	Login(ctx context.Context, req userDto.UserLoginRequest, meta dto.LoginMeta) (dto.TokenResponse, error)
+	Refresh(ctx context.Context, req dto.RefreshTokenRequest) (dto.TokenResponse, error)
+	Logout(ctx context.Context, sessionID string) error
+	LogoutAll(ctx context.Context, userID string) error
+	ListSessions(ctx context.Context, userID string, currentSessionID string) ([]dto.SessionResponse, error)
+	RevokeSession(ctx context.Context, userID string, sessionID string) error
 }
 
 type authService struct {
-	userRepository   repository.UserRepository
-	casbinRepository casbinrepo.CasbinRepository
-	jwtService       JWTService
-	enforcer         pkgcasbin.Enforcer
-	uploadClient     uploadthing.Client
-	db               *gorm.DB
+	userRepository    repository.UserRepository
+	casbinRepository  casbinrepo.CasbinRepository
+	sessionRepository authrepo.SessionRepository
+	jwtService        JWTService
+	enforcer          pkgcasbin.Enforcer
+	uploadClient      uploadthing.Client
+	db                *gorm.DB
 }
 
 func NewAuthService(
 	userRepo repository.UserRepository,
 	casbinRepo casbinrepo.CasbinRepository,
+	sessionRepo authrepo.SessionRepository,
 	jwtService JWTService,
 	enforcer pkgcasbin.Enforcer,
 	uploadClient uploadthing.Client,
 	db *gorm.DB,
 ) AuthService {
 	return &authService{
-		userRepository:   userRepo,
-		casbinRepository: casbinRepo,
-		jwtService:       jwtService,
-		enforcer:         enforcer,
-		uploadClient:     uploadClient,
-		db:               db,
+		userRepository:    userRepo,
+		casbinRepository:  casbinRepo,
+		sessionRepository: sessionRepo,
+		jwtService:        jwtService,
+		enforcer:          enforcer,
+		uploadClient:      uploadClient,
+		db:                db,
 	}
+}
+
+func hashRefreshToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+func optionalTrimmedString(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 func (s *authService) Register(ctx context.Context, req userDto.UserCreateRequest) (userDto.UserResponse, error) {
@@ -234,7 +258,39 @@ func (s *authService) uploadProfilePicture(ctx context.Context, req userDto.User
 	return url, nil
 }
 
-func (s *authService) Login(ctx context.Context, req userDto.UserLoginRequest) (dto.TokenResponse, error) {
+func (s *authService) issueTokensForUser(ctx context.Context, user entities.User, role string, meta dto.LoginMeta) (dto.TokenResponse, error) {
+	refreshToken, expiresAt, err := s.jwtService.GenerateRefreshToken()
+	if err != nil {
+		return dto.TokenResponse{}, err
+	}
+
+	session := entities.Session{
+		ID:               uuid.New(),
+		UserID:           user.ID,
+		RefreshTokenHash: hashRefreshToken(refreshToken),
+		ExpiresAt:        expiresAt,
+		UserAgent:        optionalTrimmedString(meta.UserAgent),
+		IP:               optionalTrimmedString(meta.IP),
+	}
+
+	created, err := s.sessionRepository.Create(ctx, s.db, session)
+	if err != nil {
+		return dto.TokenResponse{}, err
+	}
+
+	accessToken, err := s.jwtService.GenerateAccessToken(user.ID.String(), user.Email, role, created.ID.String())
+	if err != nil {
+		return dto.TokenResponse{}, err
+	}
+
+	return dto.TokenResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		Role:         role,
+	}, nil
+}
+
+func (s *authService) Login(ctx context.Context, req userDto.UserLoginRequest, meta dto.LoginMeta) (dto.TokenResponse, error) {
 	user, err := s.userRepository.GetUserByEmail(ctx, s.db, req.Email)
 	if err != nil {
 		return dto.TokenResponse{}, userDto.ErrEmailNotFound
@@ -253,18 +309,127 @@ func (s *authService) Login(ctx context.Context, req userDto.UserLoginRequest) (
 		return dto.TokenResponse{}, userDto.ErrRoleNotAssigned
 	}
 
+	return s.issueTokensForUser(ctx, user, roles[0], meta)
+}
+
+func (s *authService) Refresh(ctx context.Context, req dto.RefreshTokenRequest) (dto.TokenResponse, error) {
+	hash := hashRefreshToken(req.RefreshToken)
+	session, err := s.sessionRepository.FindByRefreshTokenHash(ctx, s.db, hash)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return dto.TokenResponse{}, dto.ErrRefreshTokenNotFound
+		}
+		return dto.TokenResponse{}, err
+	}
+
+	if session.RevokedAt != nil {
+		return dto.TokenResponse{}, dto.ErrSessionRevoked
+	}
+	if !session.ExpiresAt.After(time.Now()) {
+		_ = s.sessionRepository.RevokeByID(ctx, s.db, session.ID)
+		return dto.TokenResponse{}, dto.ErrRefreshTokenExpired
+	}
+
+	user, err := s.userRepository.GetUserById(ctx, s.db, session.UserID.String())
+	if err != nil {
+		return dto.TokenResponse{}, err
+	}
+
+	roles, err := s.casbinRepository.GetRolesForUser(ctx, s.db, user.Email)
+	if err != nil {
+		return dto.TokenResponse{}, err
+	}
+	if len(roles) == 0 {
+		return dto.TokenResponse{}, userDto.ErrRoleNotAssigned
+	}
 	role := roles[0]
-	accessToken, err := s.jwtService.GenerateAccessToken(user.ID.String(), user.Email, role)
+
+	newRefresh, expiresAt, err := s.jwtService.GenerateRefreshToken()
+	if err != nil {
+		return dto.TokenResponse{}, err
+	}
+
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return s.sessionRepository.UpdateRefreshToken(ctx, tx, session.ID, hashRefreshToken(newRefresh), expiresAt)
+	})
+	if err != nil {
+		return dto.TokenResponse{}, err
+	}
+
+	accessToken, err := s.jwtService.GenerateAccessToken(user.ID.String(), user.Email, role, session.ID.String())
 	if err != nil {
 		return dto.TokenResponse{}, err
 	}
 
 	return dto.TokenResponse{
-		AccessToken: accessToken,
-		Role:        role,
+		AccessToken:  accessToken,
+		RefreshToken: newRefresh,
+		Role:         role,
 	}, nil
 }
 
-func (s *authService) Logout(ctx context.Context, userId string) error {
-	return nil
+func (s *authService) Logout(ctx context.Context, sessionID string) error {
+	id, err := uuid.Parse(sessionID)
+	if err != nil {
+		return dto.ErrSessionNotFound
+	}
+	return s.sessionRepository.RevokeByID(ctx, s.db, id)
+}
+
+func (s *authService) LogoutAll(ctx context.Context, userID string) error {
+	id, err := uuid.Parse(userID)
+	if err != nil {
+		return dto.ErrSessionNotFound
+	}
+	return s.sessionRepository.RevokeAllByUserID(ctx, s.db, id)
+}
+
+func (s *authService) ListSessions(ctx context.Context, userID string, currentSessionID string) ([]dto.SessionResponse, error) {
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, dto.ErrSessionNotFound
+	}
+
+	sessions, err := s.sessionRepository.ListByUserID(ctx, s.db, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.SessionResponse, 0, len(sessions))
+	for _, session := range sessions {
+		result = append(result, dto.SessionResponse{
+			ID:        session.ID.String(),
+			UserAgent: session.UserAgent,
+			IP:        session.IP,
+			CreatedAt: session.CreatedAt,
+			ExpiresAt: session.ExpiresAt,
+			RevokedAt: session.RevokedAt,
+			IsCurrent: session.ID.String() == currentSessionID,
+		})
+	}
+	return result, nil
+}
+
+func (s *authService) RevokeSession(ctx context.Context, userID string, sessionID string) error {
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return dto.ErrSessionNotFound
+	}
+	sid, err := uuid.Parse(sessionID)
+	if err != nil {
+		return dto.ErrSessionNotFound
+	}
+
+	session, err := s.sessionRepository.FindByID(ctx, s.db, sid)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return dto.ErrSessionNotFound
+		}
+		return err
+	}
+	if session.UserID != uid {
+		return dto.ErrSessionNotFound
+	}
+
+	return s.sessionRepository.RevokeByID(ctx, s.db, sid)
 }

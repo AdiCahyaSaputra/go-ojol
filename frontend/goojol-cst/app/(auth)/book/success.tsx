@@ -10,7 +10,10 @@ import { formatRupiah, WizardShell } from '@/feature/book/components/wizard-shel
 
 export default function BookSuccessScreen() {
   const router = useRouter();
-  const { matchedDriver, quote, reset } = useBook();
+  const { matchedDriver, quote, vehicleType, vehicleMaxSize, reset } = useBook();
+  const selectedFare = quote?.vehicle_options.find(
+    (option) => option.vehicle_type === vehicleType && option.max_size === vehicleMaxSize,
+  )?.total_fare;
 
   const onDone = () => {
     reset();
@@ -53,9 +56,9 @@ export default function BookSuccessScreen() {
               <Text className="text-goojol-muted">
                 {matchedDriver.distance_m} m away · {matchedDriver.profile.type}
               </Text>
-              {quote ? (
+              {selectedFare != null ? (
                 <Text className="mt-2 text-goojol-teal">
-                  {formatRupiah(quote.total_fare)} estimated
+                  {formatRupiah(selectedFare)} estimated
                 </Text>
               ) : null}
             </VStack>

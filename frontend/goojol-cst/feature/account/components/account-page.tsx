@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Bell, ChevronRight, CreditCard, HelpCircle, LogOut, User } from 'lucide-react-native';
 import { useState } from 'react';
@@ -10,7 +11,6 @@ import { VStack } from '@/components/ui/vstack';
 import { useCurrentUserQuery } from '@/feature/user/user.query';
 import { axiosClient } from '@/lib/api/axios-client';
 import { clearSession } from '@/lib/auth/token-storage';
-import { useQueryClient } from '@tanstack/react-query';
 
 type SettingsRowProps = {
   icon: React.ReactNode;

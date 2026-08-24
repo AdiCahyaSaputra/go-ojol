@@ -8,12 +8,20 @@ export const bookLocationSchema = z.object({
 
 export type BookLocation = z.infer<typeof bookLocationSchema>;
 
+export const vehicleOptionSchema = z.object({
+  vehicle_type: z.enum(['car', 'motorcycle']),
+  max_size: z.number(),
+  total_fare: z.number(),
+});
+
+export type VehicleOption = z.infer<typeof vehicleOptionSchema>;
+
 export const calculateArgoResponseSchema = z.object({
   distance: z.number(),
   duration: z.number(),
-  fare_per_distance: z.number(),
+  path: z.array(z.tuple([z.number(), z.number()])),
   platform_percentage: z.number(),
-  total_fare: z.number(),
+  vehicle_options: z.array(vehicleOptionSchema),
 });
 
 export type CalculateArgoResponse = z.infer<typeof calculateArgoResponseSchema>;

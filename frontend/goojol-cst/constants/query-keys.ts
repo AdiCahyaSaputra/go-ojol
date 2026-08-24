@@ -7,7 +7,6 @@ export const QUERY_KEYS = {
     pickupLng: string;
     destinationLat?: string;
     destinationLng?: string;
-    vehicleType: 'car' | 'motorcycle';
   }) =>
     [
       'calculate-argo',
@@ -15,6 +14,5 @@ export const QUERY_KEYS = {
       parts.pickupLng,
       parts.destinationLat,
       parts.destinationLng,
-      parts.vehicleType,
     ] as const,
 };

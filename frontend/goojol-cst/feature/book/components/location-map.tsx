@@ -10,6 +10,7 @@ type LocationMapProps = {
   label: string;
   lat: string;
   lng: string;
+  compact?: boolean;
 };
 
 function parseCoordinate(value: string, fallback: string): number {
@@ -18,7 +19,7 @@ function parseCoordinate(value: string, fallback: string): number {
   return Number.isFinite(parsed) ? parsed : fallbackParsed;
 }
 
-export function LocationMap({ label, lat, lng }: LocationMapProps) {
+export function LocationMap({ label, lat, lng, compact = false }: LocationMapProps) {
   const center = useMemo(
     () =>
       [parseCoordinate(lng, DEFAULT_PICKUP.lng), parseCoordinate(lat, DEFAULT_PICKUP.lat)] as [
@@ -29,7 +30,11 @@ export function LocationMap({ label, lat, lng }: LocationMapProps) {
   );
 
   return (
-    <View className="mx-6 mt-4 flex-1 overflow-hidden rounded-2xl border border-goojol-border bg-goojol-surface">
+    <View
+      className={`mx-6 mt-4 overflow-hidden rounded-2xl border border-goojol-border bg-goojol-surface ${
+        compact ? 'h-44' : 'flex-1'
+      }`}
+    >
       <MapLibreMap
         style={{ flex: 1 }}
         mapStyle={OSM_RASTER_STYLE}

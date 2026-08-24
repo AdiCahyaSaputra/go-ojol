@@ -9,7 +9,6 @@ import {
 type CalculateArgoInput = {
   pickup: BookLocation;
   destination: BookLocation;
-  vehicleType: 'car' | 'motorcycle';
 };
 
 type FindDriverInput = {
@@ -23,7 +22,6 @@ export async function calculateArgo(input: CalculateArgoInput) {
   params.append('pickup_loc', input.pickup.lng);
   params.append('destination', input.destination.lat);
   params.append('destination', input.destination.lng);
-  params.append('vehicle_type', input.vehicleType);
 
   const response = await axiosClient.get(
     `/api/trip/dispatch/customer/calculate-argo?${params.toString()}`,

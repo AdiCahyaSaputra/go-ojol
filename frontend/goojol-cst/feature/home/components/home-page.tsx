@@ -14,7 +14,7 @@ export default function HomePage() {
   const displayName = user?.customer?.name ?? 'there';
 
   const startBook = () => {
-    router.push('/book/pickup');
+    router.push('/book/location');
   };
 
   return (

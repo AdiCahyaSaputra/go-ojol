@@ -34,7 +34,7 @@ export default function RidesPage() {
 
             <Button
               className="w-full max-w-xs bg-goojol-coral data-[active=true]:bg-goojol-coral/90"
-              onPress={() => router.push('/book/pickup')}
+              onPress={() => router.push('/book/location')}
               accessibilityLabel="Book a ride"
             >
               <ButtonText className="font-semibold text-white">Book a ride</ButtonText>

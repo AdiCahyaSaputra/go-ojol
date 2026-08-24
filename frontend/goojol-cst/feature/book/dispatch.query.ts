@@ -6,7 +6,6 @@ import { calculateArgo } from './dispatch.service';
 export function useCalculateArgoQuery(input: {
   pickup: BookLocation;
   destination: BookLocation | null;
-  vehicleType: 'car' | 'motorcycle';
 }) {
   const destination = input.destination;
 
@@ -16,7 +15,6 @@ export function useCalculateArgoQuery(input: {
       pickupLng: input.pickup.lng,
       destinationLat: destination?.lat,
       destinationLng: destination?.lng,
-      vehicleType: input.vehicleType,
     }),
     queryFn: () => {
       if (!destination) {
@@ -26,7 +24,6 @@ export function useCalculateArgoQuery(input: {
       return calculateArgo({
         pickup: input.pickup,
         destination,
-        vehicleType: input.vehicleType,
       });
     },
     enabled: destination != null,

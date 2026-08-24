@@ -1,30 +1,31 @@
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react';
-import { DEFAULT_PICKUP, VEHICLE_OPTIONS } from '@/constants/book';
+import { DEFAULT_PICKUP } from '@/constants/book';
 import type { BookLocation, CalculateArgoResponse, NearbyDriver } from './dispatch.schema';
+
+type VehicleType = 'car' | 'motorcycle';
 
 type BookContextValue = {
   pickup: BookLocation;
   destination: BookLocation | null;
-  vehicleId: string;
-  vehicleType: 'car' | 'motorcycle';
+  vehicleType: VehicleType;
+  vehicleMaxSize: number;
   quote: CalculateArgoResponse | null;
   matchedDriver: NearbyDriver | null;
   setPickup: (location: BookLocation) => void;
   setDestination: (location: BookLocation) => void;
-  setVehicleId: (vehicleId: string) => void;
+  setVehicleOption: (option: { vehicleType: VehicleType; maxSize: number }) => void;
   setQuote: (quote: CalculateArgoResponse | null) => void;
   setMatchedDriver: (driver: NearbyDriver | null) => void;
   reset: () => void;
 };
-
-const defaultVehicle = VEHICLE_OPTIONS[0];
 
 const BookContext = createContext<BookContextValue | null>(null);
 
 export function BookProvider({ children }: { children: ReactNode }) {
   const [pickup, setPickupState] = useState<BookLocation>(DEFAULT_PICKUP);
   const [destination, setDestinationState] = useState<BookLocation | null>(null);
-  const [vehicleId, setVehicleIdState] = useState<string>(defaultVehicle.id);
+  const [vehicleType, setVehicleType] = useState<VehicleType>('motorcycle');
+  const [vehicleMaxSize, setVehicleMaxSize] = useState(1);
   const [quote, setQuoteState] = useState<CalculateArgoResponse | null>(null);
   const [matchedDriver, setMatchedDriverState] = useState<NearbyDriver | null>(null);
 
@@ -36,22 +37,16 @@ export function BookProvider({ children }: { children: ReactNode }) {
     setDestinationState(location);
   }, []);
 
-  const setVehicleId = useCallback((id: string) => {
-    setVehicleIdState(id);
-    const option = VEHICLE_OPTIONS.find((item) => item.id === id);
-    if (option) {
-      // vehicleType is derived when vehicleId changes
-    }
+  const setVehicleOption = useCallback((option: { vehicleType: VehicleType; maxSize: number }) => {
+    setVehicleType(option.vehicleType);
+    setVehicleMaxSize(option.maxSize);
   }, []);
-
-  const vehicleType = useMemo(() => {
-    return VEHICLE_OPTIONS.find((item) => item.id === vehicleId)?.type ?? 'motorcycle';
-  }, [vehicleId]);
 
   const reset = useCallback(() => {
     setPickupState(DEFAULT_PICKUP);
     setDestinationState(null);
-    setVehicleIdState(defaultVehicle.id);
+    setVehicleType('motorcycle');
+    setVehicleMaxSize(1);
     setQuoteState(null);
     setMatchedDriverState(null);
   }, []);
@@ -60,13 +55,13 @@ export function BookProvider({ children }: { children: ReactNode }) {
     () => ({
       pickup,
       destination,
-      vehicleId,
       vehicleType,
+      vehicleMaxSize,
       quote,
       matchedDriver,
       setPickup,
       setDestination,
-      setVehicleId,
+      setVehicleOption,
       setQuote: setQuoteState,
       setMatchedDriver: setMatchedDriverState,
       reset,
@@ -74,13 +69,13 @@ export function BookProvider({ children }: { children: ReactNode }) {
     [
       pickup,
       destination,
-      vehicleId,
       vehicleType,
+      vehicleMaxSize,
       quote,
       matchedDriver,
       setPickup,
       setDestination,
-      setVehicleId,
+      setVehicleOption,
       reset,
     ],
   );

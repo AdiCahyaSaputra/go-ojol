@@ -81,7 +81,15 @@ func (l *LoginRateLimiter) Reset(key string) {
 var defaultLoginRateLimiter = NewLoginRateLimiter()
 
 func LoginRateLimit() gin.HandlerFunc {
-	return loginRateLimit(defaultLoginRateLimiter)
+	return LoginRateLimitWith(defaultLoginRateLimiter)
+}
+
+func LoginRateLimitWith(l *LoginRateLimiter) gin.HandlerFunc {
+	return loginRateLimit(l)
+}
+
+func (l *LoginRateLimiter) Key(ip, email string) string {
+	return l.key(ip, email)
 }
 
 func loginRateLimit(l *LoginRateLimiter) gin.HandlerFunc {

@@ -1,4 +1,4 @@
-package middlewares
+package tests
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/middlewares"
 	userDto "github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/dto"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -16,9 +17,9 @@ import (
 func TestLoginRateLimit_BlocksAfterFourFailures(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	limiter := NewLoginRateLimiter()
+	limiter := middlewares.NewLoginRateLimiter()
 	router := gin.New()
-	router.POST("/login", loginRateLimit(limiter), func(ctx *gin.Context) {
+	router.POST("/login", middlewares.LoginRateLimitWith(limiter), func(ctx *gin.Context) {
 		ctx.Set("login_failed", true)
 		ctx.JSON(http.StatusBadRequest, gin.H{"status": false})
 	})
@@ -45,8 +46,8 @@ func TestLoginRateLimit_BlocksAfterFourFailures(t *testing.T) {
 }
 
 func TestLoginRateLimit_ResetClearsBlockedState(t *testing.T) {
-	limiter := NewLoginRateLimiter()
-	key := limiter.key("127.0.0.1", "reset@example.com")
+	limiter := middlewares.NewLoginRateLimiter()
+	key := limiter.Key("127.0.0.1", "reset@example.com")
 
 	for i := 0; i < 4; i++ {
 		limiter.RecordFailure(key)

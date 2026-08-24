@@ -1,4 +1,4 @@
-package proxy
+package tests
 
 import (
 	"encoding/json"
@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/AdiCahyaSaputra/go-ojol/backend/gateway/proxy"
 )
 
 func TestNew_ForwardsAuthorizationToTrip(t *testing.T) {
@@ -25,7 +27,7 @@ func TestNew_ForwardsAuthorizationToTrip(t *testing.T) {
 	}))
 	defer trip.Close()
 
-	tripProxy, err := New(trip.URL)
+	tripProxy, err := proxy.New(trip.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +60,7 @@ func TestNew_ForwardsAuthLogin(t *testing.T) {
 	}))
 	defer auth.Close()
 
-	authProxy, err := New(auth.URL)
+	authProxy, err := proxy.New(auth.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +88,7 @@ func TestNew_ForwardsJWKS(t *testing.T) {
 	}))
 	defer auth.Close()
 
-	authProxy, err := New(auth.URL)
+	authProxy, err := proxy.New(auth.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +106,7 @@ func TestNew_ForwardsJWKS(t *testing.T) {
 }
 
 func TestNew_RejectsInvalidURL(t *testing.T) {
-	_, err := New("not-a-url")
+	_, err := proxy.New("not-a-url")
 	if err == nil {
 		t.Fatal("expected error")
 	}

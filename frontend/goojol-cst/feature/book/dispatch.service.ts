@@ -9,7 +9,7 @@ import {
 type CalculateArgoInput = {
   pickup: BookLocation;
   destination: BookLocation;
-  vehicleId: string;
+  vehicleType: 'car' | 'motorcycle';
 };
 
 type FindDriverInput = {
@@ -18,11 +18,16 @@ type FindDriverInput = {
 };
 
 export async function calculateArgo(input: CalculateArgoInput) {
-  const response = await axiosClient.post('/api/trip/dispatch/customer/calculate-argo', {
-    pickup_loc: [input.pickup.lat, input.pickup.lng],
-    destination: [input.destination.lat, input.destination.lng],
-    vehicle_id: input.vehicleId,
-  });
+  const params = new URLSearchParams();
+  params.append('pickup_loc', input.pickup.lat);
+  params.append('pickup_loc', input.pickup.lng);
+  params.append('destination', input.destination.lat);
+  params.append('destination', input.destination.lng);
+  params.append('vehicle_type', input.vehicleType);
+
+  const response = await axiosClient.get(
+    `/api/trip/dispatch/customer/calculate-argo?${params.toString()}`,
+  );
 
   return parsedApiResponse(calculateArgoResponseSchema, response).data;
 }

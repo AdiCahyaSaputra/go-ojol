@@ -92,9 +92,11 @@ The proxy uses `Rewrite` (`SetURL` + `SetXForwarded`) so the original path, meth
 | Method | Path | Guard |
 |---|---|---|
 | `GET` | `/api/trip/protected` | JWT + Casbin `trip:read` |
-| `POST` | `/api/trip/dispatch/calculate-argo` | JWT + Casbin `trip:create` |
+| `GET` | `/api/trip/dispatch/calculate-argo` | JWT + Casbin `trip:read` |
 | `GET` | `/api/trip/dispatch/find-driver` | JWT + Casbin `trip:read` |
 | `GET` | `/api/trip/dispatch/ws` | JWT + Casbin `trip:update` (WebSocket upgrade) |
+
+`calculate-argo` takes `pickup_loc` and `destination` as repeated query params (`lat`, `lng`) plus `vehicle_type`.
 
 `find-driver` takes `current_location` as repeated query params (`lat`, `lng`) and returns nearby standby members from Redis. Members are JWT `user_id` values until driver-table integration.
 
@@ -213,7 +215,7 @@ g, <user_email>, <role>
 
 Matcher: `g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act`.
 
-Roles: `admin`, `customer`, `driver`. Policies on `user` (`read` / `update` / `delete`) and `trip` (`create` / `read` / `update` / `delete`). Customer dispatch uses `trip:create` (calculate-argo) and `trip:read` (find-driver). Driver standby WebSocket uses `trip:update`. Register writes `g, <email>, <customer|driver>` in the same transaction as the user row, then reloads the enforcer.
+Roles: `admin`, `customer`, `driver`. Policies on `user` (`read` / `update` / `delete`) and `trip` (`create` / `read` / `update` / `delete`). Customer dispatch uses `trip:read` (calculate-argo and find-driver). Driver standby WebSocket uses `trip:update`. Register writes `g, <email>, <customer|driver>` in the same transaction as the user row, then reloads the enforcer.
 
 Policies live in `casbin_rules` via a GORM Casbin adapter. Seed JSON:
 

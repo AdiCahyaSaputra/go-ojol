@@ -45,8 +45,8 @@ export function LocationMap({ label, lat, lng }: LocationMapProps) {
       >
         <Camera center={center} zoom={15} duration={0} />
         <ViewAnnotation lngLat={center} anchor="bottom">
-          <View className="rounded-full border-2 border-goojol-coral bg-goojol-coral/20 p-2">
-            <MapPin color="#ff6b4a" size={20} />
+          <View className="rounded-full border-2 border-goojol-coral bg-goojol-coral/60 p-1">
+            <MapPin color="#ffffff" size={20} />
           </View>
         </ViewAnnotation>
       </MapLibreMap>

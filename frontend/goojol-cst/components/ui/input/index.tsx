@@ -5,7 +5,7 @@ import type { VariantProps } from '@gluestack-ui/utils/nativewind-utils';
 import { tva, withStyleContext } from '@gluestack-ui/utils/nativewind-utils';
 import { styled } from 'nativewind';
 import React from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Platform, Pressable, TextInput, View } from 'react-native';
 
 const SCOPE = 'INPUT';
 
@@ -82,6 +82,7 @@ const InputField = React.forwardRef<React.ComponentRef<typeof UIInput.Input>, II
       <UIInput.Input
         ref={ref}
         {...props}
+        style={Platform.OS === 'ios' ? { lineHeight: 0 } : {}}
         className={inputFieldStyle({
           class: className,
         })}

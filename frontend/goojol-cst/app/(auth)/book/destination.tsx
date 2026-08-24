@@ -10,6 +10,7 @@ import { DESTINATION_PRESETS } from '@/constants/book';
 import { useBook } from '@/feature/book/book-context';
 import { LocationMap } from '@/feature/book/components/location-map';
 import { WizardShell } from '@/feature/book/components/wizard-shell';
+import Margin from '@/components/ui/utils/margin';
 
 export default function BookDestinationScreen() {
   const router = useRouter();
@@ -105,6 +106,8 @@ export default function BookDestinationScreen() {
               />
             </Input>
           </FormControl>
+
+          <Margin value={24} />
         </VStack>
       </ScrollView>
     </WizardShell>

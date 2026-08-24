@@ -1,13 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import type { BookLocation } from './dispatch.schema';
-import { calculateArgo, findDriver } from './dispatch.service';
-
-export function useCalculateArgoMutation() {
-  return useMutation({
-    mutationFn: (input: { pickup: BookLocation; destination: BookLocation; vehicleId: string }) =>
-      calculateArgo(input),
-  });
-}
+import { findDriver } from './dispatch.service';
 
 export function useFindDriverMutation() {
   return useMutation({

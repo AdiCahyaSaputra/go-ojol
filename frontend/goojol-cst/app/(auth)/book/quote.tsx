@@ -1,48 +1,38 @@
-import { useRouter } from "expo-router";
-import { useEffect } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
-import { Button, ButtonSpinner, ButtonText } from "@/components/ui/button";
-import { Text } from "@/components/ui/text";
-import { VStack } from "@/components/ui/vstack";
-import { HStack } from "@/components/ui/hstack";
-import { VEHICLE_OPTIONS } from "@/constants/book";
-import { useBook } from "@/feature/book/book-context";
-import {
-  BookError,
-  formatRupiah,
-  WizardShell,
-} from "@/feature/book/components/wizard-shell";
-import { useCalculateArgoMutation } from "@/feature/book/dispatch.mutation";
-import { truncate } from "@/lib/utils/string";
+import { useRouter } from 'expo-router';
+import { LucideChevronsLeftRightEllipsis } from 'lucide-react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Pressable, View } from 'react-native';
+import { Button, ButtonSpinner, ButtonText } from '@/components/ui/button';
+import { HStack } from '@/components/ui/hstack';
+import { Text } from '@/components/ui/text';
+import { VStack } from '@/components/ui/vstack';
+import { VEHICLE_OPTIONS } from '@/constants/book';
+import { useBook } from '@/feature/book/book-context';
+import { BookError, formatRupiah, WizardShell } from '@/feature/book/components/wizard-shell';
+import { useCalculateArgoQuery } from '@/feature/book/dispatch.query';
+import { truncate } from '@/lib/utils/string';
 
 export default function BookQuoteScreen() {
   const router = useRouter();
-  const { pickup, destination, vehicleId, setVehicleId, quote, setQuote } =
-    useBook();
-  const mutation = useCalculateArgoMutation();
+  const { pickup, destination, vehicleId, vehicleType, setVehicleId, setQuote } = useBook();
+  const quoteQuery = useCalculateArgoQuery({ pickup, destination, vehicleType });
+  const quote = quoteQuery.data;
 
   useEffect(() => {
     if (!destination) {
-      router.replace("/book/destination");
+      router.replace('/book/destination');
     }
   }, [destination, router]);
 
   useEffect(() => {
-    if (!destination) {
-      return;
+    if (quote) {
+      setQuote(quote);
     }
-
-    mutation.mutate(
-      { pickup, destination, vehicleId },
-      {
-        onSuccess: (data) => setQuote(data),
-      }
-    );
-  }, [destination, pickup, vehicleId, setQuote, mutation.mutate]);
+  }, [quote, setQuote]);
 
   const onContinue = () => {
     if (quote) {
-      router.push("/book/find-driver");
+      router.push('/book/find-driver');
     }
   };
 
@@ -54,12 +44,10 @@ export default function BookQuoteScreen() {
         <Button
           className="w-full bg-goojol-coral data-[active=true]:bg-goojol-coral/90"
           onPress={onContinue}
-          isDisabled={!quote || mutation.isPending}
+          isDisabled={!quote || quoteQuery.isPending}
         >
-          {mutation.isPending ? <ButtonSpinner /> : null}
-          <ButtonText className="font-semibold text-white">
-            Find driver
-          </ButtonText>
+          {quoteQuery.isPending ? <ButtonSpinner /> : null}
+          <ButtonText className="font-semibold text-white">Find driver</ButtonText>
         </Button>
       }
     >
@@ -75,13 +63,13 @@ export default function BookQuoteScreen() {
                   onPress={() => setVehicleId(option.id)}
                   className={`flex-1 rounded-xl border px-4 py-3 ${
                     selected
-                      ? "border-goojol-coral bg-goojol-coral/10"
-                      : "border-goojol-border bg-goojol-surface"
+                      ? 'border-goojol-coral bg-goojol-coral/10'
+                      : 'border-goojol-border bg-goojol-surface'
                   }`}
                 >
                   <Text
                     className={`text-center font-medium ${
-                      selected ? "text-goojol-coral" : "text-white"
+                      selected ? 'text-goojol-coral' : 'text-white'
                     }`}
                   >
                     {option.label}
@@ -92,50 +80,51 @@ export default function BookQuoteScreen() {
           </View>
         </VStack>
 
-        <View className="rounded-2xl border border-goojol-border bg-goojol-surface p-4">
-          <HStack space="lg" className="justify-between items-center">
-            <View>
+        <View className="rounded-2xl border border-goojol-border bg-goojol-surface">
+          <HStack space="lg" className="justify-between">
+            <VStack className="w-1/3 p-4">
               <Text className="text-goojol-muted text-xs">Pickup</Text>
-              <Text className="text-base text-white">
+              <Text className="line-clamp-1 break-all text-base text-white">
                 {truncate(pickup.name, 20)}
               </Text>
-            </View>
+            </VStack>
 
-            <View className="flex-1 h-px border-goojol-coral border-t-4 border-dotted"/>
+            <VStack className="relative items-center justify-center">
+              <View className="absolute inset-y-0 w-px bg-goojol-border" />
+              <View className="rounded-full bg-goojol-surface p-1">
+                <LucideChevronsLeftRightEllipsis color="#ff6b4a" size={16} />
+              </View>
+            </VStack>
 
-            <View>
+            <VStack className="w-1/3 items-end p-4">
               <Text className="text-goojol-muted text-xs">Destination</Text>
-              <Text className="text-base text-white">
-                {truncate(destination?.name ?? "—", 20)}
+              <Text className="line-clamp-1 break-all text-base text-white">
+                {truncate(destination?.name ?? '—', 20)}
               </Text>
-            </View>
+            </VStack>
           </HStack>
         </View>
 
-        {mutation.isError ? (
-          <BookError
-            message={mutation.error.message ?? "Could not calculate fare."}
-          />
+        {quoteQuery.isError ? (
+          <BookError message={quoteQuery.error.message ?? 'Could not calculate fare.'} />
         ) : null}
 
         <View className="rounded-2xl border border-goojol-teal/30 bg-goojol-teal/10 p-4">
           <Text className="text-goojol-muted text-sm">Estimated fare</Text>
-          {mutation.isPending ? (
+          {quoteQuery.isPending ? (
             <HStack className="items-center gap-2 py-2">
               <ActivityIndicator color="#ff6b4a" size="small" />
-              <Text className="text-goojol-muted text-3xl font-bold">
-                Calculating fare…
-              </Text>
+              <Text className="font-bold text-base text-goojol-muted">Calculating fare…</Text>
             </HStack>
           ) : quote ? (
             <>
-              <Text className="font-bold text-3xl text-goojol-teal py-2">
+              <Text className="py-2 font-bold text-3xl text-goojol-teal">
                 {formatRupiah(quote.total_fare)}
               </Text>
 
               <HStack className="justify-between">
                 <Text className="mt-2 text-goojol-muted text-sm">
-                  {quote.distance.toLocaleString("id-ID")} m
+                  {quote.distance.toLocaleString('id-ID')} m
                 </Text>
 
                 <Text className="mt-2 text-goojol-muted text-sm">

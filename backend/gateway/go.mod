@@ -1,6 +1,6 @@
 module github.com/AdiCahyaSaputra/go-ojol/backend/gateway
 
-go 1.26.0
+go 1.26.6
 
 require (
 	github.com/gin-gonic/gin v1.12.0

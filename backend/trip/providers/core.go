@@ -15,6 +15,7 @@ import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/drivergeo"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/session"
 	"github.com/redis/go-redis/v9"
 	"github.com/samber/do"
 	"gorm.io/gorm"
@@ -38,6 +39,11 @@ func RegisterDependencies(injector *do.Injector) {
 
 	do.ProvideNamed(injector, constants.JWKSVerifier, func(i *do.Injector) (jwks.Verifier, error) {
 		return jwks.NewVerifierFromEnv()
+	})
+
+	do.ProvideNamed(injector, constants.SessionChecker, func(i *do.Injector) (session.Checker, error) {
+		db := do.MustInvokeNamed[*gorm.DB](i, constants.DB)
+		return session.NewRepository(db), nil
 	})
 
 	do.ProvideNamed(injector, constants.CasbinEnforcer, func(i *do.Injector) (pkgcasbin.Enforcer, error) {

@@ -6,6 +6,7 @@ import (
 	pkgcasbin "github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/casbin"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/session"
 	"github.com/gin-gonic/gin"
 	"github.com/samber/do"
 	"gorm.io/gorm"
@@ -15,10 +16,11 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 	dispatchController := do.MustInvoke[controller.DispatchController](injector)
 
 	verifier := do.MustInvokeNamed[jwks.Verifier](injector, constants.JWKSVerifier)
+	sessions := do.MustInvokeNamed[session.Checker](injector, constants.SessionChecker)
 	db := do.MustInvokeNamed[*gorm.DB](injector, constants.DB)
 	enforcer := do.MustInvokeNamed[pkgcasbin.Enforcer](injector, constants.CasbinEnforcer)
 
-	authenticate := middlewares.Authenticate(verifier)
+	authenticate := middlewares.Authenticate(verifier, sessions)
 
 	dispatchCustomerRoutes := server.Group(constants.ROUTE_GROUP + "/dispatch/customer")
 	{

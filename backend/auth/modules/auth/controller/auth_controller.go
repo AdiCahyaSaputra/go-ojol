@@ -55,7 +55,6 @@ func (c *authController) Register(ctx *gin.Context) {
 		return
 	}
 
-	// Validate request
 	if err := c.authValidation.ValidateRegisterRequest(req); err != nil {
 		res := utils.BuildResponseFailed("Validation failed", err.Error(), nil)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
@@ -64,7 +63,16 @@ func (c *authController) Register(ctx *gin.Context) {
 
 	result, err := c.authService.Register(ctx.Request.Context(), req)
 	if err != nil {
-		res := utils.BuildResponseFailed(userDto.MESSAGE_FAILED_REGISTER_USER, err.Error(), nil)
+		res := utils.BuildResponseFailed(userDto.MESSAGE_FAILED_REGISTER_USER, utils.ClientErrorMessage(err,
+			userDto.ErrCreateUser,
+			userDto.ErrEmailAlreadyExists,
+			userDto.ErrInvalidRole,
+			userDto.ErrRoleNotAssigned,
+			userDto.ErrVehicleRequired,
+			userDto.ErrLicenseNumberExists,
+			userDto.ErrInvalidProfilePicture,
+			userDto.ErrUploadProfilePicture,
+		), nil)
 		ctx.JSON(http.StatusBadRequest, res)
 		return
 	}
@@ -81,7 +89,6 @@ func (c *authController) Login(ctx *gin.Context) {
 		return
 	}
 
-	// Validate request
 	if err := c.authValidation.ValidateLoginRequest(req); err != nil {
 		res := utils.BuildResponseFailed("Validation failed", err, nil)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
@@ -93,7 +100,11 @@ func (c *authController) Login(ctx *gin.Context) {
 		IP:        ctx.ClientIP(),
 	})
 	if err != nil {
-		res := utils.BuildResponseFailed(userDto.MESSAGE_FAILED_LOGIN, err.Error(), nil)
+		res := utils.BuildResponseFailed(userDto.MESSAGE_FAILED_LOGIN, utils.ClientErrorMessage(err,
+			dto.ErrInvalidCredentials,
+			userDto.ErrEmailNotFound,
+			userDto.ErrRoleNotAssigned,
+		), nil)
 		ctx.JSON(http.StatusBadRequest, res)
 		return
 	}
@@ -124,7 +135,11 @@ func (c *authController) Refresh(ctx *gin.Context) {
 			errors.Is(err, dto.ErrSessionRevoked) {
 			status = http.StatusUnauthorized
 		}
-		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_REFRESH_TOKEN, err.Error(), nil)
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_REFRESH_TOKEN, utils.ClientErrorMessage(err,
+			dto.ErrRefreshTokenNotFound,
+			dto.ErrRefreshTokenExpired,
+			dto.ErrSessionRevoked,
+		), nil)
 		ctx.JSON(status, res)
 		return
 	}
@@ -143,7 +158,7 @@ func (c *authController) Logout(ctx *gin.Context) {
 
 	err := c.authService.Logout(ctx.Request.Context(), sessionID)
 	if err != nil {
-		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_LOGOUT, err.Error(), nil)
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_LOGOUT, utils.ClientErrorMessage(err), nil)
 		ctx.JSON(http.StatusBadRequest, res)
 		return
 	}
@@ -157,7 +172,7 @@ func (c *authController) LogoutAll(ctx *gin.Context) {
 
 	err := c.authService.LogoutAll(ctx.Request.Context(), userID)
 	if err != nil {
-		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_LOGOUT_ALL, err.Error(), nil)
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_LOGOUT_ALL, utils.ClientErrorMessage(err), nil)
 		ctx.JSON(http.StatusBadRequest, res)
 		return
 	}
@@ -172,7 +187,7 @@ func (c *authController) ListSessions(ctx *gin.Context) {
 
 	result, err := c.authService.ListSessions(ctx.Request.Context(), userID, sessionID)
 	if err != nil {
-		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_LIST_SESSIONS, err.Error(), nil)
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_LIST_SESSIONS, utils.ClientErrorMessage(err), nil)
 		ctx.JSON(http.StatusBadRequest, res)
 		return
 	}
@@ -191,7 +206,7 @@ func (c *authController) RevokeSession(ctx *gin.Context) {
 		if errors.Is(err, dto.ErrSessionNotFound) {
 			status = http.StatusNotFound
 		}
-		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_REVOKE_SESSION, err.Error(), nil)
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_REVOKE_SESSION, utils.ClientErrorMessage(err, dto.ErrSessionNotFound), nil)
 		ctx.JSON(status, res)
 		return
 	}

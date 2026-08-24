@@ -26,6 +26,8 @@ const (
 	defaultIngestHost = "ingest.uploadthing.com"
 	signaturePrefix   = "hmac-sha256="
 	defaultAlphabet   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	// profilePictureACL keeps avatars world-readable so drivers and customers can load them by URL.
+	profilePictureACL = "public-read"
 )
 
 type Client interface {
@@ -154,7 +156,7 @@ func (c *client) signedUploadURL(fileKey, filename, contentType string, size int
 	values.Set("x-ut-file-size", strconv.FormatInt(size, 10))
 	values.Set("x-ut-file-type", contentType)
 	values.Set("x-ut-content-disposition", "inline")
-	values.Set("x-ut-acl", "public-read")
+	values.Set("x-ut-acl", profilePictureACL)
 
 	unsigned := base + "?" + values.Encode()
 	mac := hmac.New(sha256.New, []byte(c.apiKey))

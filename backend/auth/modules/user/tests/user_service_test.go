@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/repository"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/service"
 	"github.com/google/uuid"
@@ -119,4 +120,38 @@ func TestUserService_GetUserById_CustomerHasNoVehicle(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result.Customer)
 	assert.Nil(t, result.Driver)
+}
+
+func TestUserService_DeleteRemovesTargetUser(t *testing.T) {
+	db := setupUserTestDB(t)
+	svc := service.NewUserService(repository.NewUserRepository(db), db)
+
+	adminID := uuid.New()
+	targetID := uuid.New()
+
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, email, password) VALUES (?, ?, ?)`,
+		adminID.String(), "admin@example.com", "hashed",
+	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, email, password) VALUES (?, ?, ?)`,
+		targetID.String(), "target@example.com", "hashed",
+	).Error)
+
+	err := svc.Delete(context.Background(), targetID.String())
+	require.NoError(t, err)
+
+	_, err = svc.GetUserById(context.Background(), targetID.String())
+	assert.Error(t, err)
+
+	_, err = svc.GetUserById(context.Background(), adminID.String())
+	require.NoError(t, err)
+}
+
+func TestUserService_DeleteMissingUserReturnsNotFound(t *testing.T) {
+	db := setupUserTestDB(t)
+	svc := service.NewUserService(repository.NewUserRepository(db), db)
+
+	err := svc.Delete(context.Background(), uuid.New().String())
+	assert.ErrorIs(t, err, dto.ErrUserNotFound)
 }

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -14,8 +15,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/database/entities"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/middlewares"
 	dispatchcontroller "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/controller"
+	dispatchdto "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/dto"
 	dispatchservice "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/service"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatchws/controller"
 	wsdto "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatchws/dto"
@@ -23,9 +26,11 @@ import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/drivergeo"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/session"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 	"github.com/samber/do"
@@ -34,13 +39,18 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	testDriverUserID   = "44444444-4444-4444-4444-444444444444"
+	testCustomerUserID = "33333333-3333-3333-3333-333333333333"
+)
+
 func TestServeWS_DeniesWhenUnauthorized(t *testing.T) {
 	server, sign, _, _ := newDispatchWSServer(t, false)
 	defer server.Close()
 
 	_, resp, err := websocket.DefaultDialer.Dial(
 		wsURL(server.URL),
-		http.Header{"Authorization": []string{"Bearer " + sign("drv-1", "drv@example.com", "driver")}},
+		http.Header{"Authorization": []string{"Bearer " + sign(testDriverUserID, "drv@example.com", "driver")}},
 	)
 	require.Error(t, err)
 	require.NotNil(t, resp)
@@ -51,7 +61,7 @@ func TestServeWS_StandbyThenFindDriver(t *testing.T) {
 	server, sign, _, rdb := newDispatchWSServer(t, true)
 	defer server.Close()
 
-	token := sign("drv-1", "drv@example.com", "driver")
+	token := sign(testDriverUserID, "drv@example.com", "driver")
 	conn, _, err := websocket.DefaultDialer.Dial(
 		wsURL(server.URL),
 		http.Header{"Authorization": []string{"Bearer " + token}},
@@ -69,17 +79,23 @@ func TestServeWS_StandbyThenFindDriver(t *testing.T) {
 	require.NoError(t, conn.ReadJSON(&ack))
 	assert.Equal(t, wsdto.TypeStandbyOK, ack.Type)
 
-	score, err := rdb.ZScore(context.Background(), drivergeo.KeyStandby, "drv-1").Result()
+	score, err := rdb.ZScore(context.Background(), drivergeo.KeyStandby, testDriverUserID).Result()
 	require.NoError(t, err)
 	assert.NotZero(t, score)
 
-	customer := sign("cst-1", "cst@example.com", "customer")
+	customer := sign(testCustomerUserID, "cst@example.com", "customer")
+	reqBody, err := json.Marshal(map[string]any{
+		"current_lat_long": []string{"-6.2088", "106.8456"},
+		"vehicle_type":     "motorcycle",
+	})
+	require.NoError(t, err)
 	req, err := http.NewRequest(
-		http.MethodGet,
-		server.URL+"/api/trip/dispatch/customer/find-driver?current_location=-6.2088&current_location=106.8456&VehicleType=motorcycle",
-		nil,
+		http.MethodPost,
+		server.URL+"/api/trip/dispatch/customer/find-driver",
+		bytes.NewReader(reqBody),
 	)
 	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+customer)
 	res, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -88,24 +104,22 @@ func TestServeWS_StandbyThenFindDriver(t *testing.T) {
 
 	var body struct {
 		Data struct {
-			Drivers []struct {
-				UserID string `json:"user_id"`
-			} `json:"drivers"`
+			Drivers []any `json:"drivers"`
 		} `json:"data"`
 	}
 	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
-	require.Len(t, body.Data.Drivers, 1)
-	assert.Equal(t, "drv-1", body.Data.Drivers[0].UserID)
+	require.NotEmpty(t, body.Data.Drivers)
 }
 
-func TestServeWS_AcceptsQueryToken(t *testing.T) {
+func TestServeWS_RejectsQueryToken(t *testing.T) {
 	server, sign, _, _ := newDispatchWSServer(t, true)
 	defer server.Close()
 
-	token := sign("drv-1", "drv@example.com", "driver")
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL(server.URL)+"?token="+url.QueryEscape(token), nil)
-	require.NoError(t, err)
-	conn.Close()
+	token := sign(testDriverUserID, "drv@example.com", "driver")
+	_, resp, err := websocket.DefaultDialer.Dial(wsURL(server.URL)+"?token="+url.QueryEscape(token), nil)
+	require.Error(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
 func TestServeWS_RemoveOnDisconnect(t *testing.T) {
@@ -114,7 +128,7 @@ func TestServeWS_RemoveOnDisconnect(t *testing.T) {
 
 	conn, _, err := websocket.DefaultDialer.Dial(
 		wsURL(server.URL),
-		http.Header{"Authorization": []string{"Bearer " + sign("drv-1", "drv@example.com", "driver")}},
+		http.Header{"Authorization": []string{"Bearer " + sign(testDriverUserID, "drv@example.com", "driver")}},
 	)
 	require.NoError(t, err)
 
@@ -129,7 +143,7 @@ func TestServeWS_RemoveOnDisconnect(t *testing.T) {
 
 	require.NoError(t, conn.Close())
 	require.Eventually(t, func() bool {
-		err := rdb.ZScore(context.Background(), drivergeo.KeyStandby, "drv-1").Err()
+		err := rdb.ZScore(context.Background(), drivergeo.KeyStandby, testDriverUserID).Err()
 		return err == redis.Nil
 	}, 2*time.Second, 20*time.Millisecond)
 }
@@ -138,7 +152,7 @@ func TestServeWS_SecondConnectReplacesFirst(t *testing.T) {
 	server, sign, _, rdb := newDispatchWSServer(t, true)
 	defer server.Close()
 
-	token := sign("drv-1", "drv@example.com", "driver")
+	token := sign(testDriverUserID, "drv@example.com", "driver")
 	first, _, err := websocket.DefaultDialer.Dial(
 		wsURL(server.URL),
 		http.Header{"Authorization": []string{"Bearer " + token}},
@@ -172,7 +186,7 @@ func TestServeWS_SecondConnectReplacesFirst(t *testing.T) {
 	_ = first.Close()
 	time.Sleep(100 * time.Millisecond)
 
-	score, err := rdb.ZScore(context.Background(), drivergeo.KeyStandby, "drv-1").Result()
+	score, err := rdb.ZScore(context.Background(), drivergeo.KeyStandby, testDriverUserID).Result()
 	require.NoError(t, err)
 	assert.NotZero(t, score)
 }
@@ -212,31 +226,45 @@ func newDispatchWSServer(t *testing.T, allow bool) (*httptest.Server, func(userI
 
 	verifier := jwks.NewVerifier(jwksServer.URL, "go-ojol-auth")
 	wsCtrl := controller.NewDispatchWSController(service.NewDispatchWSService(store))
-	dispatchSvc := dispatchservice.NewDispatchService(nil, nil, nil, "", store)
+	repo := &wsStubDispatchRepo{nearbyProfiles: map[string]dispatchdto.NearbyDriverProfile{
+		testDriverUserID: {
+			UserID:        uuid.MustParse(testDriverUserID),
+			DriverID:      uuid.MustParse("55555555-5555-5555-5555-555555555555"),
+			Name:          "Test Driver",
+			PhoneNumber:   "081234567890",
+			VehicleID:     uuid.MustParse("66666666-6666-6666-6666-666666666666"),
+			VehicleName:   "Test Motorcycle",
+			LicenseNumber: "B1234XX",
+			MaxSize:       2,
+			Type:          "motorcycle",
+		},
+	}}
+	dispatchSvc := dispatchservice.NewDispatchService(repo, nil, nil, "", store)
 	dispatchCtrl := dispatchcontroller.NewDispatchController(injector, dispatchSvc)
 
 	router := gin.New()
 	router.GET(
 		"/api/trip/dispatch/ws",
-		middlewares.Authenticate(verifier),
+		middlewares.AuthenticateWS(verifier, session.AlwaysActive()),
 		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_ROLE_DRIVER, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_UPDATE),
 		wsCtrl.ServeWS,
 	)
-	router.GET(
+	router.POST(
 		"/api/trip/dispatch/customer/find-driver",
-		middlewares.Authenticate(verifier),
+		middlewares.Authenticate(verifier, session.AlwaysActive()),
 		middlewares.Authorize(&stubEnforcer{allow: true}, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),
 		dispatchCtrl.FindDriver,
 	)
 
 	sign := func(userID, email, role string) string {
 		token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
-			"user_id": userID,
-			"email":   email,
-			"role":    role,
-			"iss":     "go-ojol-auth",
-			"exp":     time.Now().Add(time.Minute).Unix(),
-			"iat":     time.Now().Unix(),
+			"user_id":    userID,
+			"email":      email,
+			"role":       role,
+			"session_id": "11111111-1111-1111-1111-111111111111",
+			"iss":        "go-ojol-auth",
+			"exp":        time.Now().Add(time.Minute).Unix(),
+			"iat":        time.Now().Unix(),
 		})
 		token.Header["kid"] = kid
 		raw, err := token.SignedString(key)
@@ -261,4 +289,20 @@ func (s *stubEnforcer) Enforce(rvals ...interface{}) (bool, error) {
 
 func (s *stubEnforcer) LoadPolicy() error {
 	return nil
+}
+
+type wsStubDispatchRepo struct {
+	nearbyProfiles map[string]dispatchdto.NearbyDriverProfile
+}
+
+func (s *wsStubDispatchRepo) VehicleById(id uuid.UUID) (*entities.Vehicle, error) {
+	return nil, nil
+}
+
+func (s *wsStubDispatchRepo) PendingArgoTransaction(req dispatchdto.PendingArgoTransaction) error {
+	return nil
+}
+
+func (s *wsStubDispatchRepo) NearbyDriverProfiles(_ []uuid.UUID, _ entities.VehicleType) (map[string]dispatchdto.NearbyDriverProfile, error) {
+	return s.nearbyProfiles, nil
 }

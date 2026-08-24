@@ -37,9 +37,10 @@ type JWKS struct {
 }
 
 type Claims struct {
-	UserID string
-	Email  string
-	Role   string
+	UserID    string
+	Email     string
+	Role      string
+	SessionID string
 }
 
 type Verifier interface {
@@ -128,11 +129,16 @@ func (v *verifier) Verify(raw string) (*Claims, error) {
 	if err != nil {
 		return nil, err
 	}
+	sessionID, err := claimString(mapClaims, "session_id")
+	if err != nil {
+		return nil, err
+	}
 
 	return &Claims{
-		UserID: userID,
-		Email:  email,
-		Role:   role,
+		UserID:    userID,
+		Email:     email,
+		Role:      role,
+		SessionID: sessionID,
 	}, nil
 }
 

@@ -6,13 +6,23 @@ import (
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/session"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
-func Authenticate(verifier jwks.Verifier) gin.HandlerFunc {
+func Authenticate(verifier jwks.Verifier, sessions session.Checker) gin.HandlerFunc {
+	return authenticate(verifier, sessions)
+}
+
+func AuthenticateWS(verifier jwks.Verifier, sessions session.Checker) gin.HandlerFunc {
+	return authenticate(verifier, sessions)
+}
+
+func authenticate(verifier jwks.Verifier, sessions session.Checker) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		raw, ok := bearerOrQueryToken(ctx)
+		raw, ok := bearerToken(ctx)
 		if !ok {
 			if raw == "" {
 				response := utils.BuildResponseFailed(dto.MESSAGE_FAILED_PROSES_REQUEST, dto.MESSAGE_FAILED_TOKEN_NOT_FOUND, nil)
@@ -37,19 +47,33 @@ func Authenticate(verifier jwks.Verifier) gin.HandlerFunc {
 			return
 		}
 
+		sessionUUID, err := uuid.Parse(claims.SessionID)
+		if err != nil {
+			response := utils.BuildResponseFailed(dto.MESSAGE_FAILED_PROSES_REQUEST, dto.MESSAGE_FAILED_TOKEN_NOT_VALID, nil)
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response)
+			return
+		}
+
+		active, err := sessions.IsActive(ctx.Request.Context(), sessionUUID)
+		if err != nil || !active {
+			response := utils.BuildResponseFailed(dto.MESSAGE_FAILED_PROSES_REQUEST, dto.MESSAGE_FAILED_DENIED_ACCESS, nil)
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response)
+			return
+		}
+
 		ctx.Set("token", raw)
 		ctx.Set("user_id", claims.UserID)
 		ctx.Set("email", claims.Email)
 		ctx.Set("role", claims.Role)
+		ctx.Set("session_id", claims.SessionID)
 		ctx.Next()
 	}
 }
 
-func bearerOrQueryToken(ctx *gin.Context) (raw string, ok bool) {
+func bearerToken(ctx *gin.Context) (raw string, ok bool) {
 	authHeader := ctx.GetHeader("Authorization")
 	if authHeader == "" {
-		raw = ctx.Query("token")
-		return raw, raw != ""
+		return "", false
 	}
 	if !strings.HasPrefix(authHeader, "Bearer ") {
 		return authHeader, false

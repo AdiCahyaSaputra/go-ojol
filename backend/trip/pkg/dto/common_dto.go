@@ -9,6 +9,7 @@ const (
 	MESSAGE_FAILED_TOKEN_NOT_VALID = "token not valid"
 	MESSAGE_FAILED_DENIED_ACCESS   = "denied access"
 	MESSAGE_FAILED_GET_DATA_FROM_BODY = "failed get data from body"
+	MESSAGE_INTERNAL_SERVER_ERROR     = "An error occurred on our server"
 
 	// Success
 	MESSAGE_SUCCESS_GET_DATA = "success get data"

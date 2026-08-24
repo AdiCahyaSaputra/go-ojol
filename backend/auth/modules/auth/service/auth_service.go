@@ -1,9 +1,12 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -234,10 +237,19 @@ func (s *authService) uploadProfilePicture(ctx context.Context, req userDto.User
 		return "", userDto.ErrInvalidProfilePicture
 	}
 
-	contentType := fileHeader.Header.Get("Content-Type")
-	if contentType == "" {
+	file, err := fileHeader.Open()
+	if err != nil {
 		return "", userDto.ErrInvalidProfilePicture
 	}
+	defer file.Close()
+
+	head := make([]byte, 512)
+	n, readErr := io.ReadFull(file, head)
+	if readErr != nil && readErr != io.ErrUnexpectedEOF && readErr != io.EOF {
+		return "", userDto.ErrInvalidProfilePicture
+	}
+
+	contentType := http.DetectContentType(head[:n])
 	if idx := strings.Index(contentType, ";"); idx >= 0 {
 		contentType = strings.TrimSpace(contentType[:idx])
 	}
@@ -245,13 +257,8 @@ func (s *authService) uploadProfilePicture(ctx context.Context, req userDto.User
 		return "", userDto.ErrInvalidProfilePicture
 	}
 
-	file, err := fileHeader.Open()
-	if err != nil {
-		return "", userDto.ErrInvalidProfilePicture
-	}
-	defer file.Close()
-
-	url, err := s.uploadClient.Upload(ctx, fileHeader.Filename, contentType, fileHeader.Size, file)
+	reader := io.MultiReader(bytes.NewReader(head[:n]), file)
+	url, err := s.uploadClient.Upload(ctx, fileHeader.Filename, contentType, fileHeader.Size, reader)
 	if err != nil {
 		return "", userDto.ErrUploadProfilePicture
 	}

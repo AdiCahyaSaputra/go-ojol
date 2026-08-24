@@ -48,7 +48,7 @@ func (c *userController) GetAllUser(ctx *gin.Context) {
 
 	users, total, err := pagination.PaginatedQueryWithIncludable[query.User](c.db, filter)
 	if err != nil {
-		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_GET_USER, err.Error(), nil)
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_GET_LIST_USER, utils.ClientErrorMessage(err), nil)
 		ctx.JSON(http.StatusBadRequest, res)
 		return
 	}
@@ -63,7 +63,7 @@ func (c *userController) Me(ctx *gin.Context) {
 
 	result, err := c.userService.GetUserById(ctx.Request.Context(), userId)
 	if err != nil {
-		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_GET_USER, err.Error(), nil)
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_GET_USER, utils.ClientErrorMessage(err, dto.ErrUserNotFound, dto.ErrGetUserById), nil)
 		ctx.JSON(http.StatusBadRequest, res)
 		return
 	}
@@ -89,7 +89,7 @@ func (c *userController) Update(ctx *gin.Context) {
 	userId := ctx.MustGet("user_id").(string)
 	result, err := c.userService.Update(ctx.Request.Context(), req, userId)
 	if err != nil {
-		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_UPDATE_USER, err.Error(), nil)
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_UPDATE_USER, utils.ClientErrorMessage(err, dto.ErrUpdateUser, dto.ErrUserNotFound), nil)
 		ctx.JSON(http.StatusBadRequest, res)
 		return
 	}
@@ -99,10 +99,10 @@ func (c *userController) Update(ctx *gin.Context) {
 }
 
 func (c *userController) Delete(ctx *gin.Context) {
-	userId := ctx.MustGet("user_id").(string)
+	targetID := ctx.Param("id")
 
-	if err := c.userService.Delete(ctx.Request.Context(), userId); err != nil {
-		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_DELETE_USER, err.Error(), nil)
+	if err := c.userService.Delete(ctx.Request.Context(), targetID); err != nil {
+		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_DELETE_USER, utils.ClientErrorMessage(err, dto.ErrDeleteUser, dto.ErrUserNotFound), nil)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}

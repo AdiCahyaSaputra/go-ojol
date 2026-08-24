@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/repository"
@@ -98,5 +99,9 @@ func (s *userService) Update(ctx context.Context, req dto.UserUpdateRequest, use
 }
 
 func (s *userService) Delete(ctx context.Context, userId string) error {
-	return s.userRepository.Delete(ctx, s.db, userId)
+	err := s.userRepository.Delete(ctx, s.db, userId)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return dto.ErrUserNotFound
+	}
+	return err
 }

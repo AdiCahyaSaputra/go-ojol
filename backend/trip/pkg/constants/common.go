@@ -21,6 +21,7 @@ const (
 
 	DB             = "db"
 	JWKSVerifier   = "JWKSVerifier"
+	SessionChecker = "SessionChecker"
 	CasbinEnforcer = "CasbinEnforcer"
 	Redis          = "redis"
 )

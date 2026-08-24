@@ -1,10 +1,11 @@
-package casbin
+package tests
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/database/entities"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/casbin"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,7 +42,7 @@ func TestEnforcer_EnforceByEmailResourceAction(t *testing.T) {
 	}
 	require.NoError(t, db.Create(&rules).Error)
 
-	enforcer, err := NewEnforcer(db)
+	enforcer, err := casbin.NewEnforcer(db)
 	require.NoError(t, err)
 
 	allowed, err := enforcer.Enforce("ada@example.com", constants.ENUM_RESOURCE_USER, constants.ENUM_ACTION_READ)

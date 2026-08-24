@@ -1,6 +1,6 @@
 module github.com/AdiCahyaSaputra/go-ojol/backend/auth
 
-go 1.26.0
+go 1.26.6
 
 require (
 	github.com/Caknoooo/go-pagination v0.1.0
@@ -12,6 +12,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.12.3
 	github.com/samber/do v1.6.0
+	github.com/sqids/sqids-go v0.4.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.50.0
 	gorm.io/driver/postgres v1.6.0
@@ -50,7 +51,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
-	github.com/sqids/sqids-go v0.4.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect

@@ -28,14 +28,14 @@ const (
 
 	farePerKmMotorcycle = 2500 // IDR
 	farePerKmCar        = 4500 // IDR
-	platformPercentage  = 10
+	platformPct         = 10
+	maxSizeFareStepPct  = 2
 )
 
 var (
 	ErrNoRoute         = errors.New("no route found")
 	ErrOSRMUnavailable = errors.New("routing service unavailable")
 	ErrInvalidLatLong  = errors.New("invalid lat long")
-	ErrUnknownVehicle  = errors.New("unknown vehicle type")
 	ErrLocationStore   = errors.New("location store unavailable")
 )
 
@@ -89,29 +89,39 @@ func (s *dispatchService) CalculateArgo(ctx context.Context, req dto.CalculateAr
 		return dto.CalculateArgoResponse{}, err
 	}
 
-	farePerDistance, err := farePerDistanceFor(req.VehicleType)
+	route, err := s.getOSRMRoute(ctx, pickupLat, pickupLng, destLat, destLng)
 	if err != nil {
 		return dto.CalculateArgoResponse{}, err
 	}
 
-	route, err := s.getOSRMRoute(ctx, pickupLat, pickupLng, destLat, destLng)
+	categories, err := s.dispatchRepository.DistinctVehicleCategories()
 	if err != nil {
 		return dto.CalculateArgoResponse{}, err
 	}
 
 	distance := int(math.Round(route.Distance))
 	duration := int(math.Round(route.Duration))
-	base := int(math.Round(float64(distance) / 1000 * float64(farePerDistance)))
-	platformFare := base * platformPercentage / 100
-	total := int(math.Ceil(float64(base + (platformFare))))
+	vehicleOptions := make([]dto.VehicleOption, 0, len(categories))
+
+	for _, category := range categories {
+		farePerDistance, ok := farePerDistanceFor(category.VehicleType)
+		if !ok {
+			continue
+		}
+
+		vehicleOptions = append(vehicleOptions, dto.VehicleOption{
+			VehicleType: category.VehicleType,
+			MaxSize:     category.MaxSize,
+			TotalFare:   calculateTotalFare(distance, farePerDistance, category.MaxSize),
+		})
+	}
 
 	return dto.CalculateArgoResponse{
 		Distance:           distance,
 		Duration:           duration,
 		Path:               geoJSONToLatLngPath(route.Geometry.Coordinates),
-		FarePerDistance:    farePerDistance,
-		PlatformPercentage: platformPercentage,
-		TotalFare:          total,
+		PlatformPercentage: platformPct,
+		VehicleOptions:     vehicleOptions,
 	}, nil
 }
 
@@ -262,15 +272,27 @@ func formatCoord(value float64) string {
 	return strconv.FormatFloat(value, 'f', -1, 64)
 }
 
-func farePerDistanceFor(vehicleType entities.VehicleType) (int, error) {
+func farePerDistanceFor(vehicleType entities.VehicleType) (int, bool) {
 	switch vehicleType {
 	case entities.VehicleTypeMotorcycle:
-		return farePerKmMotorcycle, nil
+		return farePerKmMotorcycle, true
 	case entities.VehicleTypeCar:
-		return farePerKmCar, nil
+		return farePerKmCar, true
 	default:
-		return 0, ErrUnknownVehicle
+		return 0, false
 	}
+}
+
+func calculateTotalFare(distance, farePerDistance, maxSize int) int {
+	sizePct := 100
+	if maxSize > 1 {
+		sizePct += (maxSize - 1) * maxSizeFareStepPct
+	}
+
+	numerator := int64(distance) * int64(farePerDistance) * int64(sizePct) * int64(100+platformPct)
+	denominator := int64(1000 * 100 * 100)
+
+	return int((numerator + denominator - 1) / denominator)
 }
 
 // The geoJSON response is in reverse [long, lat] so we need to re-reverse it

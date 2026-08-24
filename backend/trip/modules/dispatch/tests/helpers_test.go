@@ -45,6 +45,8 @@ func (s *stubEnforcer) LoadPolicy() error {
 type stubDispatchRepo struct {
 	vehicle            *entities.Vehicle
 	vehicleErr         error
+	vehicleCategories  []dto.VehicleCategory
+	vehicleCatErr      error
 	pendingErr         error
 	nearbyProfiles     map[string]dto.NearbyDriverProfile
 	nearbyProfilesErr  error
@@ -61,6 +63,19 @@ func (s *stubDispatchRepo) VehicleById(id uuid.UUID) (*entities.Vehicle, error) 
 		return nil, nil
 	}
 	return s.vehicle, nil
+}
+
+func (s *stubDispatchRepo) DistinctVehicleCategories() ([]dto.VehicleCategory, error) {
+	if s.vehicleCatErr != nil {
+		return nil, s.vehicleCatErr
+	}
+	if s.vehicleCategories != nil {
+		return s.vehicleCategories, nil
+	}
+	return []dto.VehicleCategory{
+		{VehicleType: entities.VehicleTypeMotorcycle, MaxSize: 1},
+		{VehicleType: entities.VehicleTypeCar, MaxSize: 4},
+	}, nil
 }
 
 func (s *stubDispatchRepo) PendingArgoTransaction(req dto.PendingArgoTransaction) error {

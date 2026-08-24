@@ -34,18 +34,27 @@ const (
 
 type (
 	CalculateArgoRequest struct {
-		PickupLoc   [2]string            `form:"pickup_loc" binding:"required,len=2" validate:"required,latlong"`
-		Destination [2]string            `form:"destination" binding:"required,len=2" validate:"required,latlong"`
-		VehicleType entities.VehicleType `form:"vehicle_type" binding:"required" validate:"required,vehicle_type"`
+		PickupLoc   [2]string `form:"pickup_loc" binding:"required,len=2" validate:"required,latlong"`
+		Destination [2]string `form:"destination" binding:"required,len=2" validate:"required,latlong"`
+	}
+
+	VehicleCategory struct {
+		VehicleType entities.VehicleType `json:"vehicle_type" gorm:"column:type"`
+		MaxSize     int                  `json:"max_size" gorm:"column:max_size"`
+	}
+
+	VehicleOption struct {
+		VehicleType     entities.VehicleType `json:"vehicle_type"`
+		MaxSize         int                  `json:"max_size"`
+		TotalFare       int                  `json:"total_fare"`
 	}
 
 	CalculateArgoResponse struct {
-		Distance           int          `json:"distance"`
-		Duration           int          `json:"duration"`
-		Path               [][2]float64 `json:"path"`
-		FarePerDistance    int          `json:"fare_per_distance"`
-		PlatformPercentage int          `json:"platform_percentage"`
-		TotalFare          int          `json:"total_fare"`
+		Distance           int             `json:"distance"`
+		Duration           int             `json:"duration"`
+		Path               [][2]float64    `json:"path"`
+		PlatformPercentage int             `json:"platform_percentage"`
+		VehicleOptions     []VehicleOption `json:"vehicle_options"`
 	}
 
 	FindDriverRequest struct {

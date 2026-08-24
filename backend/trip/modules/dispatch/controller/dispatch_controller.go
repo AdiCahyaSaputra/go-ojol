@@ -60,7 +60,7 @@ func (c *dispatchController) CalculateArgo(ctx *gin.Context) {
 	result, err := c.dispatchService.CalculateArgo(ctx.Request.Context(), req)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if errors.Is(err, service.ErrNoRoute) || errors.Is(err, service.ErrInvalidLatLong) || errors.Is(err, service.ErrUnknownVehicle) {
+		if errors.Is(err, service.ErrNoRoute) || errors.Is(err, service.ErrInvalidLatLong) {
 			status = http.StatusBadRequest
 		} else if errors.Is(err, service.ErrOSRMUnavailable) {
 			status = http.StatusBadGateway

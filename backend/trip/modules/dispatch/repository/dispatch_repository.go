@@ -11,6 +11,7 @@ import (
 
 type DispatchRepository interface {
 	VehicleById(id uuid.UUID) (*entities.Vehicle, error)
+	DistinctVehicleCategories() ([]dto.VehicleCategory, error)
 	NearbyDriverProfiles(driverUserIds []uuid.UUID, vehicleType entities.VehicleType) (map[string]dto.NearbyDriverProfile, error)
 	PendingArgoTransaction(req dto.PendingArgoTransaction) error
 }
@@ -37,6 +38,21 @@ func (r *dispatchRepository) VehicleById(id uuid.UUID) (*entities.Vehicle, error
 	}
 
 	return vehicle, nil
+}
+
+func (r *dispatchRepository) DistinctVehicleCategories() ([]dto.VehicleCategory, error) {
+	var categories []dto.VehicleCategory
+
+	err := r.db.
+		Table("vehicles").
+		Select("distinct type, max_size").
+		Order("type, max_size").
+		Scan(&categories).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return categories, nil
 }
 
 func (r *dispatchRepository) NearbyDriverProfiles(driverUserIds []uuid.UUID, vehicleType entities.VehicleType) (map[string]dto.NearbyDriverProfile, error) {

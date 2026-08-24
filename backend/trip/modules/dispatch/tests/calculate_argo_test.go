@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const validCalculateArgoQuery = "/api/trip/dispatch/customer/calculate-argo?pickup_loc=-6.2088&pickup_loc=106.8456&destination=-6.1754&destination=106.8272&vehicle_type=motorcycle"
+const validCalculateArgoQuery = "/api/trip/dispatch/customer/calculate-argo?pickup_loc=-6.2088&pickup_loc=106.8456&destination=-6.1754&destination=106.8272"
 
 func TestCalculateArgo_RequiresBearer(t *testing.T) {
 	router, _ := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
@@ -43,7 +43,7 @@ func TestCalculateArgo_RejectsInvalidToken(t *testing.T) {
 func TestCalculateArgo_RejectsInvalidBody(t *testing.T) {
 	router, sign := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/trip/dispatch/customer/calculate-argo?pickup_loc=1000&pickup_loc=106.8456&destination=-6.1754&destination=106.8272&vehicle_type=motorcycle", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/trip/dispatch/customer/calculate-argo?pickup_loc=1000&pickup_loc=106.8456&destination=-6.1754&destination=106.8272", nil)
 	req.Header.Set("Authorization", "Bearer "+sign("user-1", "user@example.com", "customer"))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -79,21 +79,29 @@ func TestCalculateArgo_ReturnsQuote(t *testing.T) {
 		Status  bool   `json:"status"`
 		Message string `json:"message"`
 		Data    struct {
-			Distance           int          `json:"distance"`
-			Duration           int          `json:"duration"`
-			Path               [][2]float64 `json:"path"`
-			FarePerDistance    int          `json:"fare_per_distance"`
-			PlatformPercentage int          `json:"platform_percentage"`
-			TotalFare          int          `json:"total_fare"`
+			Distance           int                 `json:"distance"`
+			Duration           int                 `json:"duration"`
+			Path               [][2]float64        `json:"path"`
+			PlatformPercentage int                 `json:"platform_percentage"`
+			VehicleOptions     []dto.VehicleOption `json:"vehicle_options"`
 		} `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	assert.True(t, body.Status)
 	assert.Equal(t, 2000, body.Data.Distance)
 	assert.Equal(t, 180, body.Data.Duration)
-	assert.Equal(t, 2500, body.Data.FarePerDistance)
 	assert.Equal(t, 10, body.Data.PlatformPercentage)
-	assert.Equal(t, 5500, body.Data.TotalFare)
+	require.Len(t, body.Data.VehicleOptions, 2)
+	assert.Equal(t, dto.VehicleOption{
+		VehicleType: entities.VehicleTypeMotorcycle,
+		MaxSize:     1,
+		TotalFare:   5500,
+	}, body.Data.VehicleOptions[0])
+	assert.Equal(t, dto.VehicleOption{
+		VehicleType: entities.VehicleTypeCar,
+		MaxSize:     4,
+		TotalFare:   10494,
+	}, body.Data.VehicleOptions[1])
 	require.Equal(t, [][2]float64{{-6.2088, 106.8456}, {-6.2, 106.84}}, body.Data.Path)
 }
 
@@ -157,13 +165,18 @@ func TestCalculateArgo_MotorcycleFareAndPath(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	repo := &stubDispatchRepo{}
+	repo := &stubDispatchRepo{
+		vehicleCategories: []dto.VehicleCategory{
+			{VehicleType: entities.VehicleTypeMotorcycle, MaxSize: 1},
+			{VehicleType: entities.VehicleTypeCar, MaxSize: 4},
+			{VehicleType: entities.VehicleTypeCar, MaxSize: 7},
+		},
+	}
 	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
 
 	result, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
-		VehicleType: entities.VehicleTypeMotorcycle,
 	})
 	require.NoError(t, err)
 
@@ -174,13 +187,28 @@ func TestCalculateArgo_MotorcycleFareAndPath(t *testing.T) {
 
 	assert.Equal(t, 2000, result.Distance)
 	assert.Equal(t, 180, result.Duration)
-	assert.Equal(t, 2500, result.FarePerDistance)
 	assert.Equal(t, 10, result.PlatformPercentage)
-	assert.Equal(t, 5500, result.TotalFare)
+	assert.Equal(t, []dto.VehicleOption{
+		{
+			VehicleType: entities.VehicleTypeMotorcycle,
+			MaxSize:     1,
+			TotalFare:   5500,
+		},
+		{
+			VehicleType: entities.VehicleTypeCar,
+			MaxSize:     4,
+			TotalFare:   10494,
+		},
+		{
+			VehicleType: entities.VehicleTypeCar,
+			MaxSize:     7,
+			TotalFare:   11088,
+		},
+	}, result.VehicleOptions)
 	require.Equal(t, [][2]float64{{-6.2088, 106.8456}, {-6.2, 106.84}}, result.Path)
 }
 
-func TestCalculateArgo_CarFare(t *testing.T) {
+func TestCalculateArgo_SizeIncrementFare(t *testing.T) {
 	osrm := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{
@@ -194,19 +222,27 @@ func TestCalculateArgo_CarFare(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	repo := &stubDispatchRepo{}
+	repo := &stubDispatchRepo{
+		vehicleCategories: []dto.VehicleCategory{
+			{VehicleType: entities.VehicleTypeCar, MaxSize: 4},
+		},
+	}
 	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
 
 	result, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
-		VehicleType: entities.VehicleTypeCar,
 	})
 	require.NoError(t, err)
 
 	assert.Equal(t, 1000, result.Distance)
-	assert.Equal(t, 4500, result.FarePerDistance)
-	assert.Equal(t, 4950, result.TotalFare)
+	assert.Equal(t, []dto.VehicleOption{
+		{
+			VehicleType: entities.VehicleTypeCar,
+			MaxSize:     4,
+			TotalFare:   5247,
+		},
+	}, result.VehicleOptions)
 	assert.Empty(t, result.Path)
 }
 
@@ -223,7 +259,6 @@ func TestCalculateArgo_NoRoute(t *testing.T) {
 	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
-		VehicleType: entities.VehicleTypeMotorcycle,
 	})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, service.ErrNoRoute))
@@ -241,7 +276,6 @@ func TestCalculateArgo_OSRMUnavailable(t *testing.T) {
 	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
-		VehicleType: entities.VehicleTypeMotorcycle,
 	})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, service.ErrOSRMUnavailable))
@@ -259,7 +293,6 @@ func TestCalculateArgo_InvalidJSONFromOSRM(t *testing.T) {
 	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
-		VehicleType: entities.VehicleTypeMotorcycle,
 	})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, service.ErrOSRMUnavailable))
@@ -270,10 +303,16 @@ func TestCalculateArgoResponseJSONIncludesPath(t *testing.T) {
 		Distance:           2000,
 		Duration:           180,
 		Path:               [][2]float64{{-6.2, 106.8}},
-		FarePerDistance:    2500,
 		PlatformPercentage: 20,
-		TotalFare:          6000,
+		VehicleOptions: []dto.VehicleOption{
+			{
+				VehicleType: entities.VehicleTypeMotorcycle,
+				MaxSize:     1,
+				TotalFare:   6000,
+			},
+		},
 	})
 	require.NoError(t, err)
 	assert.Contains(t, string(body), `"path":[[-6.2,106.8]]`)
+	assert.Contains(t, string(body), `"vehicle_options":[`)
 }

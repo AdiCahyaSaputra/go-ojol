@@ -22,7 +22,7 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 	authRoutes := server.Group(constants.ROUTE_GROUP)
 	{
 		authRoutes.POST("/register", authController.Register)
-		authRoutes.POST("/login", authController.Login)
+		authRoutes.POST("/login", middlewares.LoginRateLimit(), authController.Login)
 		authRoutes.POST("/refresh", authController.Refresh)
 		authRoutes.POST("/logout", authenticate, authController.Logout)
 		authRoutes.POST("/logout-all", authenticate, authController.LogoutAll)

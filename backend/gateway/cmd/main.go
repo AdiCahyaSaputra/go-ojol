@@ -45,6 +45,10 @@ func run(server *gin.Engine) {
 func main() {
 	_ = godotenv.Load(".env")
 
+	if os.Getenv("APP_ENV") != "localhost" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	injector := do.New()
 	providers.RegisterDependencies(injector)
 
@@ -58,7 +62,9 @@ func main() {
 		log.Fatal("AUTH_SERVICE_URL and TRIP_SERVICE_URL are required")
 	}
 
-	server := gin.Default()
+	server := gin.New()
+	server.Use(gin.Logger())
+	server.Use(middlewares.Recovery())
 	server.Use(middlewares.CORSMiddleware())
 
 	proxyServers := []proxy.ProxyCfg{

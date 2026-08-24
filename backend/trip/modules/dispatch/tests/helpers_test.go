@@ -19,6 +19,7 @@ import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/drivergeo"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/session"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
@@ -127,12 +128,13 @@ func newTestSigner(t *testing.T) (verifier jwks.Verifier, sign func(userID, emai
 	verifier = jwks.NewVerifier(jwksServer.URL, "go-ojol-auth")
 	sign = func(userID, email, role string) string {
 		token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
-			"user_id": userID,
-			"email":   email,
-			"role":    role,
-			"iss":     "go-ojol-auth",
-			"exp":     time.Now().Add(time.Minute).Unix(),
-			"iat":     time.Now().Unix(),
+			"user_id":    userID,
+			"email":      email,
+			"role":       role,
+			"session_id": "11111111-1111-1111-1111-111111111111",
+			"iss":        "go-ojol-auth",
+			"exp":        time.Now().Add(time.Minute).Unix(),
+			"iat":        time.Now().Unix(),
 		})
 		token.Header["kid"] = kid
 		raw, err := token.SignedString(key)
@@ -175,7 +177,7 @@ func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler, allow bool) 
 	router := gin.New()
 	router.POST(
 		"/api/trip/dispatch/customer/calculate-argo",
-		middlewares.Authenticate(verifier),
+		middlewares.Authenticate(verifier, session.AlwaysActive()),
 		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_CREATE),
 		injectCustomer(),
 		dispatchCtrl.CalculateArgo,
@@ -222,7 +224,7 @@ func newFindDriverRouterWithStoreAndAllow(
 	router := gin.New()
 	router.POST(
 		"/api/trip/dispatch/customer/find-driver",
-		middlewares.Authenticate(verifier),
+		middlewares.Authenticate(verifier, session.AlwaysActive()),
 		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),
 		dispatchCtrl.FindDriver,
 	)
@@ -247,7 +249,7 @@ func newSetDriverModeRouter(t *testing.T, allow bool, store *drivergeo.Store) (*
 	router := gin.New()
 	router.POST(
 		"/api/trip/dispatch/driver/mode",
-		middlewares.Authenticate(verifier),
+		middlewares.Authenticate(verifier, session.AlwaysActive()),
 		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_ROLE_DRIVER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_UPDATE),
 		dispatchCtrl.SetDriverMode,
 	)

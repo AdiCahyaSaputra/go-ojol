@@ -45,6 +45,10 @@ func run(server *gin.Engine) {
 }
 
 func main() {
+	if os.Getenv("APP_ENV") != "localhost" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	var (
 		injector = do.New()
 	)
@@ -55,7 +59,9 @@ func main() {
 		return
 	}
 
-	server := gin.Default()
+	server := gin.New()
+	server.Use(gin.Logger())
+	server.Use(middlewares.Recovery())
 	server.Use(middlewares.CORSMiddleware())
 
 	trip.RegisterRoutes(server, injector)

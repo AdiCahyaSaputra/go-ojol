@@ -9,7 +9,7 @@ import (
 type User struct {
 	ID       uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
 	Email    string    `gorm:"type:varchar(150);uniqueIndex;not null" json:"email"`
-	Password string    `gorm:"type:varchar(255);not null" json:"password"`
+	Password string    `gorm:"type:varchar(255);not null" json:"-"`
 
 	Customer *Customer `gorm:"foreignKey:UserID;references:ID" json:"customer,omitempty"`
 	Driver   *Driver   `gorm:"foreignKey:UserID;references:ID" json:"driver,omitempty"`

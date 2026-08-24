@@ -15,6 +15,7 @@ import (
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/controller"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/session"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
@@ -36,6 +37,29 @@ func TestProtected_RejectsInvalidToken(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/trip/protected", nil)
 	req.Header.Set("Authorization", "Bearer not-a-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestProtected_RejectsQueryToken(t *testing.T) {
+	router, sign := newProtectedRouter(t, true)
+	raw := sign("user-1", "user@example.com", "customer")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/trip/protected?token="+raw, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestProtected_RejectsInactiveSession(t *testing.T) {
+	router, sign := newProtectedRouterWithSessions(t, true, session.Inactive())
+	raw := sign("user-1", "user@example.com", "customer")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/trip/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -82,6 +106,10 @@ func TestProtected_DeniesWhenUnauthorized(t *testing.T) {
 }
 
 func newProtectedRouter(t *testing.T, allow bool) (*gin.Engine, func(userID, email, role string) string) {
+	return newProtectedRouterWithSessions(t, allow, session.AlwaysActive())
+}
+
+func newProtectedRouterWithSessions(t *testing.T, allow bool, sessions session.Checker) (*gin.Engine, func(userID, email, role string) string) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -109,19 +137,20 @@ func newProtectedRouter(t *testing.T, allow bool) (*gin.Engine, func(userID, ema
 	router := gin.New()
 	router.GET(
 		"/api/trip/protected",
-		middlewares.Authenticate(verifier),
+		middlewares.Authenticate(verifier, sessions),
 		middlewares.Authorize(&stubEnforcer{allow: allow}, "", constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_READ),
 		controller.NewTripController().Protected,
 	)
 
 	sign := func(userID, email, role string) string {
 		token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
-			"user_id": userID,
-			"email":   email,
-			"role":    role,
-			"iss":     "go-ojol-auth",
-			"exp":     time.Now().Add(time.Minute).Unix(),
-			"iat":     time.Now().Unix(),
+			"user_id":    userID,
+			"email":      email,
+			"role":       role,
+			"session_id": "11111111-1111-1111-1111-111111111111",
+			"iss":        "go-ojol-auth",
+			"exp":        time.Now().Add(time.Minute).Unix(),
+			"iat":        time.Now().Unix(),
 		})
 		token.Header["kid"] = kid
 		raw, err := token.SignedString(key)

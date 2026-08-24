@@ -1,6 +1,6 @@
 module github.com/AdiCahyaSaputra/go-ojol/backend/trip
 
-go 1.26.0
+go 1.26.6
 
 require (
 	github.com/alicebob/miniredis/v2 v2.38.1-0.20260816071855-ab8b77c12bdd

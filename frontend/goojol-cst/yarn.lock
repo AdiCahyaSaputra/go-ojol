@@ -1171,6 +1171,11 @@
   resolved "https://registry.yarnpkg.com/@expo/schema-utils/-/schema-utils-56.0.1.tgz#44b993a64ed8dc0439e7571edf3d70b0f0b78bc4"
   integrity sha512-CZ/+mYbQmWeOnkCGlWy9K+lFxbJSMFY7+TqBZcKzBSTU5Q7IGRvn/sOG3TdNjIdLPmbA8xe7R/c3UUQ28R9i9w==
 
+"@expo/schema-utils@^56.0.2":
+  version "56.0.2"
+  resolved "https://registry.yarnpkg.com/@expo/schema-utils/-/schema-utils-56.0.2.tgz#c659ff01599117d49fece720c8387a0d4de52aa7"
+  integrity sha512-WcOH1E6rwxRqNwBzPOVhd5GBbMlS04+5n+ZMdhdwKOg/Kt3suV+F8F6An+z8mUJ8eSuMM3HD9Sj09t7vc/Xjkw==
+
 "@expo/sdk-runtime-versions@^1.0.0":
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/@expo/sdk-runtime-versions/-/sdk-runtime-versions-1.0.0.tgz#d7ebd21b19f1c6b0395e50d78da4416941c57f7c"
@@ -1370,6 +1375,39 @@
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/@legendapp/tools/-/tools-2.0.1.tgz#995fe6cb3e2398b939f645505aa8e1abc84bd07f"
   integrity sha512-Kxt0HWvWElRK6oybHRzcYxdgaKGwuaiRNreS7usW7QuHXRIHaH4yMcW2YNRG4DHE5fpefv+Bno/BohQcCE4FaA==
+
+"@mapbox/jsonlint-lines-primitives@~2.0.2":
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/@mapbox/jsonlint-lines-primitives/-/jsonlint-lines-primitives-2.0.3.tgz#7d7b0b971fbaf6d60953272db4df03020d3fb004"
+  integrity sha512-0SElaV0uMxEnxzBhhX9WTuPyUeMsAN/SS0i16tjuba4/mio63MG9khjC1a0JAiPGXAwvwm4UfHJURCN7nyudQg==
+
+"@mapbox/unitbezier@^0.0.1":
+  version "0.0.1"
+  resolved "https://registry.yarnpkg.com/@mapbox/unitbezier/-/unitbezier-0.0.1.tgz#d32deb66c7177e9e9dfc3bbd697083e2e657ff01"
+  integrity sha512-nMkuDXFv60aBr9soUG5q+GvZYL+2KZHVvsqFCzqnkGEf46U2fvmytHaEVc1/YZbiLn8X+eR3QzX1+dwDO1lxlw==
+
+"@maplibre/maplibre-gl-style-spec@24.8.5":
+  version "24.8.5"
+  resolved "https://registry.yarnpkg.com/@maplibre/maplibre-gl-style-spec/-/maplibre-gl-style-spec-24.8.5.tgz#ddf33510e3a1b491d011c2f4a18253035e44ba95"
+  integrity sha512-EzEJmMt6thioRH7GI9LWS7ahXTcAhAPGWCe6oTP2Ps4YnsXOOAfeqx854lZaiDnwURfHmcCKV1mr6oo0i23x6w==
+  dependencies:
+    "@mapbox/jsonlint-lines-primitives" "~2.0.2"
+    "@mapbox/unitbezier" "^0.0.1"
+    json-stringify-pretty-compact "^4.0.0"
+    minimist "^1.2.8"
+    quickselect "^3.0.0"
+    tinyqueue "^3.0.0"
+
+"@maplibre/maplibre-react-native@^11.3.7":
+  version "11.3.7"
+  resolved "https://registry.yarnpkg.com/@maplibre/maplibre-react-native/-/maplibre-react-native-11.3.7.tgz#9048fd507c6bc3f30ea36efc887fca416a019027"
+  integrity sha512-CkL7dRP3WukZqL1MSt99ix2Pj9nfid0Q/d6jCLvdgNfwMfJZI7nJgtybvQN6/XlwH6TxhZy6O9Q9JeCtBWXNXQ==
+  dependencies:
+    "@maplibre/maplibre-gl-style-spec" "24.8.5"
+    "@turf/distance" "^7.3.5"
+    "@turf/helpers" "^7.3.5"
+    "@turf/length" "^7.3.5"
+    "@turf/nearest-point-on-line" "^7.3.5"
 
 "@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4":
   version "3.0.4"
@@ -2202,6 +2240,65 @@
   resolved "https://registry.yarnpkg.com/@testing-library/user-event/-/user-event-14.6.1.tgz#13e09a32d7a8b7060fe38304788ebf4197cd2149"
   integrity sha512-vq7fv0rnt+QTXgPxr5Hjc210p6YKq2kmdziLgnsZGgLJ9e6VAShx1pACLuRjd/AS/sr7phAR58OIIpf0LlmQNw==
 
+"@turf/distance@7.4.0", "@turf/distance@^7.3.5":
+  version "7.4.0"
+  resolved "https://registry.yarnpkg.com/@turf/distance/-/distance-7.4.0.tgz#7ddbc863f6e510749b60f02780f3c96fb8d2db06"
+  integrity sha512-ODkopQDG1m/U6Mx7OMmShncaCvneomwX3lZY1CDA7x40bhDdTTRYP/n/6LicZVyIO4/oK+aXkov4NOtWYthA2g==
+  dependencies:
+    "@turf/helpers" "7.4.0"
+    "@turf/invariant" "7.4.0"
+    "@types/geojson" "^7946.0.10"
+    tslib "^2.8.1"
+
+"@turf/helpers@7.4.0", "@turf/helpers@^7.3.5":
+  version "7.4.0"
+  resolved "https://registry.yarnpkg.com/@turf/helpers/-/helpers-7.4.0.tgz#5589f04812ac95f8985e9396db01d9e70f4a35d5"
+  integrity sha512-7PAwLZqOdRzTI5g9bHvUwlloAXPDH/mlajtryk0tw4ZwGMtmXsAyF4QundsAMfy4u48Fyd3AUqMXY0SMxqJGWg==
+  dependencies:
+    "@types/geojson" "^7946.0.10"
+    tslib "^2.8.1"
+
+"@turf/invariant@7.4.0":
+  version "7.4.0"
+  resolved "https://registry.yarnpkg.com/@turf/invariant/-/invariant-7.4.0.tgz#b96eb3a1965cca126fcf15571058d126cc7a32e2"
+  integrity sha512-OAsc3qdNx+tRqzWmMNFMnVlWWACIqnYqIejZKvb2oKkKPYJJrURPXZ6OdrGD58ljJMolLoqwIZGSx3VndaEjxg==
+  dependencies:
+    "@turf/helpers" "7.4.0"
+    "@types/geojson" "^7946.0.10"
+    tslib "^2.8.1"
+
+"@turf/length@^7.3.5":
+  version "7.4.0"
+  resolved "https://registry.yarnpkg.com/@turf/length/-/length-7.4.0.tgz#9636b32ea3fa70b02ca51957550adff78749d96a"
+  integrity sha512-vQsJLuL7uy8m6HAMuJJKoiOHYY1de1Hd6mY/fM90qfu2RyIrkoF8J4bRUb72XZNCVnvob/eHpUMdhZeoUhSyfQ==
+  dependencies:
+    "@turf/distance" "7.4.0"
+    "@turf/helpers" "7.4.0"
+    "@turf/meta" "7.4.0"
+    "@types/geojson" "^7946.0.10"
+    tslib "^2.8.1"
+
+"@turf/meta@7.4.0":
+  version "7.4.0"
+  resolved "https://registry.yarnpkg.com/@turf/meta/-/meta-7.4.0.tgz#99c3b3af4c2e5a7ef0b4f99c9f42120e82a91e62"
+  integrity sha512-3cLUvlEyDuSnMSzrjhaLAEiYR8xhbfWyTVQlrlEw40xL81d4KF4PqUWbjTXKpXZStdYbet2GCurl79KMypNw6g==
+  dependencies:
+    "@turf/helpers" "7.4.0"
+    "@types/geojson" "^7946.0.10"
+    tslib "^2.8.1"
+
+"@turf/nearest-point-on-line@^7.3.5":
+  version "7.4.0"
+  resolved "https://registry.yarnpkg.com/@turf/nearest-point-on-line/-/nearest-point-on-line-7.4.0.tgz#b4d46251eb6335ffc794eae315dd22932362d951"
+  integrity sha512-eKTKf/qODIsPankYMZrNfI3LjLaVtQvYV/1hcj9kH/Zr3GfLUszevjhTRDZtMgTFrv8+awW3+MyhmN+PJGuLdQ==
+  dependencies:
+    "@turf/distance" "7.4.0"
+    "@turf/helpers" "7.4.0"
+    "@turf/invariant" "7.4.0"
+    "@turf/meta" "7.4.0"
+    "@types/geojson" "^7946.0.10"
+    tslib "^2.8.1"
+
 "@tybys/wasm-util@^0.10.2", "@tybys/wasm-util@^0.10.3":
   version "0.10.3"
   resolved "https://registry.yarnpkg.com/@tybys/wasm-util/-/wasm-util-0.10.3.tgz#015cba9e9dd47ce14d03d2a8c5d547bfb169665d"
@@ -2215,6 +2312,11 @@
   integrity sha512-KSVgmQmzMwPlmtljOomayoR89W4FynCAi3E8PPs7vmDVPe84hT+vGPKkJfThkmXs0x0jAaa9U8uW8bbfyS2fWw==
   dependencies:
     "@types/ms" "*"
+
+"@types/geojson@^7946.0.10":
+  version "7946.0.16"
+  resolved "https://registry.yarnpkg.com/@types/geojson/-/geojson-7946.0.16.tgz#8ebe53d69efada7044454e3305c19017d97ced2a"
+  integrity sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==
 
 "@types/istanbul-lib-coverage@*", "@types/istanbul-lib-coverage@^2.0.0":
   version "2.0.6"
@@ -3188,6 +3290,38 @@ expo-constants@~56.0.16, expo-constants@~56.0.17:
   dependencies:
     "@expo/env" "~2.3.0"
 
+expo-dev-client@~56.0.25:
+  version "56.0.25"
+  resolved "https://registry.yarnpkg.com/expo-dev-client/-/expo-dev-client-56.0.25.tgz#ebe2f215c0282be3aa9c91e497f6566d7d38f0c0"
+  integrity sha512-rV2SzS3TjUU0gz2l6X97DhazUvgkpIy/RoB7bP1+ieq3ru90IPXGcLQ6O/9iNYG8tWs101jNC8U9ZHL+SLOgVw==
+  dependencies:
+    expo-dev-launcher "~56.0.26"
+    expo-dev-menu "~56.0.22"
+    expo-dev-menu-interface "~56.0.0"
+    expo-manifests "~56.0.4"
+    expo-updates-interface "~56.0.1"
+
+expo-dev-launcher@~56.0.26:
+  version "56.0.26"
+  resolved "https://registry.yarnpkg.com/expo-dev-launcher/-/expo-dev-launcher-56.0.26.tgz#de65aeef4eaa912cf92acf8c4b037cc35cbe7db9"
+  integrity sha512-p8qM4lutkTWLFCJd/GrVXrF3au4kxUPXirHZyRqY7k/COHLw8MgsQeqcHVqGYcE/YVzpNLexq19hHumPoAO4Pw==
+  dependencies:
+    "@expo/schema-utils" "^56.0.2"
+    expo-dev-menu "~56.0.22"
+    expo-manifests "~56.0.4"
+
+expo-dev-menu-interface@~56.0.0:
+  version "56.0.1"
+  resolved "https://registry.yarnpkg.com/expo-dev-menu-interface/-/expo-dev-menu-interface-56.0.1.tgz#2e072832775c5a5fba8fd1630095c5f905f10583"
+  integrity sha512-odATx0ZL/Kis10sKSBiKiGQxAB6coSi/KQtKcMhnQVNno6FkRh5/4e5BqcEvpq2rNMTiQp4ytNAQHtdwbPXvGA==
+
+expo-dev-menu@~56.0.22:
+  version "56.0.22"
+  resolved "https://registry.yarnpkg.com/expo-dev-menu/-/expo-dev-menu-56.0.22.tgz#b5a153c68c45b34461381774cd28316d03afdf47"
+  integrity sha512-xTo3WxcFll3YVnvKXo4KIOGeUwSABrnxztv1J+JzbEc77pOVQhc+ZepXz4c8fksCDBMIW0kO00O29Oe8HotfhA==
+  dependencies:
+    expo-dev-menu-interface "~56.0.0"
+
 expo-file-system@~56.0.7:
   version "56.0.7"
   resolved "https://registry.yarnpkg.com/expo-file-system/-/expo-file-system-56.0.7.tgz#66a69361d839afa1773dc247b160da166e3df0da"
@@ -3205,6 +3339,11 @@ expo-glass-effect@^56.0.4:
   resolved "https://registry.yarnpkg.com/expo-glass-effect/-/expo-glass-effect-56.0.4.tgz#4549a8c84058fb88619ecb2e818be36f2fe003ee"
   integrity sha512-xI9rXtDwi7RW82uAlfyaXO6+k21ApWJ2tHAWYqPr/FjfmZbKsgNJ4Q0iZzGPCwboqjTGxaRZ61SZxBl8hDt5iA==
 
+expo-json-utils@~56.0.0:
+  version "56.0.0"
+  resolved "https://registry.yarnpkg.com/expo-json-utils/-/expo-json-utils-56.0.0.tgz#ddf903e571c3d985ca670c028d06970926a1d3e0"
+  integrity sha512-lUqyv9aIGDbYTQ5Nux2FnH2/Dz0w5uJ8Pr080eS0StXi2jr5OmuMNErpzUnpfnYOU55xKotd4AHv68PfV/ludg==
+
 expo-keep-awake@~56.0.3:
   version "56.0.3"
   resolved "https://registry.yarnpkg.com/expo-keep-awake/-/expo-keep-awake-56.0.3.tgz#88991b4859c77af73cf68c500839a18fe5d8febe"
@@ -3217,6 +3356,13 @@ expo-linking@~56.0.13:
   dependencies:
     expo-constants "~56.0.16"
     invariant "^2.2.4"
+
+expo-manifests@~56.0.4:
+  version "56.0.4"
+  resolved "https://registry.yarnpkg.com/expo-manifests/-/expo-manifests-56.0.4.tgz#ae3ac93868cb0fb3940ab43b166a98f82e24a00f"
+  integrity sha512-Fokawl2UkiExIF0bqGoblRFA8lYpROVD+EpvDwSW4LgqQyPwNua1gLSgHZjdl5GsVugfRMMWE3LHaibDyX93hw==
+  dependencies:
+    expo-json-utils "~56.0.0"
 
 expo-modules-autolinking@~56.0.15:
   version "56.0.15"
@@ -3307,6 +3453,11 @@ expo-symbols@^56.0.6:
   dependencies:
     "@expo-google-fonts/material-symbols" "^0.4.1"
     sf-symbols-typescript "^2.0.0"
+
+expo-updates-interface@~56.0.1:
+  version "56.0.2"
+  resolved "https://registry.yarnpkg.com/expo-updates-interface/-/expo-updates-interface-56.0.2.tgz#39ad3894535901773419a477cb478df95df9e38c"
+  integrity sha512-eWTwSZ9y8vrULG2oBn2TQSSIwBGSq/TxGJ3jY6tuVS2FWH/ASRIiKs3zkUZTRoC3ZuV2alz0mUClYV7nNrFx8g==
 
 expo@~56.0.9:
   version "56.0.9"
@@ -3788,6 +3939,11 @@ jsesc@^3.0.2, jsesc@~3.1.0:
   resolved "https://registry.yarnpkg.com/jsesc/-/jsesc-3.1.0.tgz#74d335a234f67ed19907fdadfac7ccf9d409825d"
   integrity sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA==
 
+json-stringify-pretty-compact@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/json-stringify-pretty-compact/-/json-stringify-pretty-compact-4.0.0.tgz#cf4844770bddee3cb89a6170fe4b00eee5dbf1d4"
+  integrity sha512-3CNZ2DnrpByG9Nqj6Xo8vqbjT4F6N+tb4Gb28ESAZjYZ5yqvmc56J+/kuIwkaAMOyblTQhUW7PxMkUb8Q36N3Q==
+
 json5@^2.2.3:
   version "2.2.3"
   resolved "https://registry.yarnpkg.com/json5/-/json5-2.2.3.tgz#78cd6f1a19bdc12b73db5ad0c61efd66c1e29283"
@@ -4235,6 +4391,11 @@ minimatch@^8.0.2:
   dependencies:
     brace-expansion "^2.0.1"
 
+minimist@^1.2.8:
+  version "1.2.8"
+  resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.8.tgz#c1a464e7693302e082a075cee0c057741ac4772c"
+  integrity sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==
+
 minipass@^4.2.4:
   version "4.2.8"
   resolved "https://registry.yarnpkg.com/minipass/-/minipass-4.2.8.tgz#f0010f64393ecfc1d1ccb5f582bcaf45f48e1a3a"
@@ -4619,6 +4780,11 @@ queue@6.0.2:
   integrity sha512-iHZWu+q3IdFZFX36ro/lKBkSvfkztY5Y7HMiPlOUjhupPcG2JMfst2KKEpu5XndviX/3UhFbRngUPNKtgvtZiA==
   dependencies:
     inherits "~2.0.3"
+
+quickselect@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/quickselect/-/quickselect-3.0.0.tgz#a37fc953867d56f095a20ac71c6d27063d2de603"
+  integrity sha512-XdjUArbK4Bm5fLLvlm5KpTFOiOThgfWWI4axAZDWg4E/0mKdZyI9tNEfds27qCi1ze/vwTR16kvmmGhRra3c2g==
 
 range-parser@~1.2.1:
   version "1.2.1"
@@ -5289,6 +5455,11 @@ tinyglobby@^0.2.15:
   dependencies:
     fdir "^6.5.0"
     picomatch "^4.0.4"
+
+tinyqueue@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/tinyqueue/-/tinyqueue-3.0.0.tgz#101ea761ccc81f979e29200929e78f1556e3661e"
+  integrity sha512-gRa9gwYU3ECmQYv3lslts5hxuIa90veaEcxDYuu3QGOIAEM2mOZkVHp48ANJuu1CURtRdHKUBY5Lm1tHV+sD4g==
 
 tmpl@1.0.5:
   version "1.0.5"

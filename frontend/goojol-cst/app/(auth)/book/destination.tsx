@@ -8,7 +8,7 @@ import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { DESTINATION_PRESETS } from '@/constants/book';
 import { useBook } from '@/feature/book/book-context';
-import { MapPlaceholder } from '@/feature/book/components/map-placeholder';
+import { LocationMap } from '@/feature/book/components/location-map';
 import { WizardShell } from '@/feature/book/components/wizard-shell';
 
 export default function BookDestinationScreen() {
@@ -46,7 +46,7 @@ export default function BookDestinationScreen() {
         </Button>
       }
     >
-      <MapPlaceholder label={name || 'Destination'} lat={lat} lng={lng} />
+      <LocationMap label={name || 'Destination'} lat={lat} lng={lng} />
 
       <ScrollView className="flex-1 px-6 py-4" keyboardShouldPersistTaps="handled">
         <VStack space="md">

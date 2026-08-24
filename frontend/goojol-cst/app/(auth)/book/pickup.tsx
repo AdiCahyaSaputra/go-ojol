@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
-import { Button, ButtonText } from '@/components/ui/button';
 import { View } from 'react-native';
+import { Button, ButtonText } from '@/components/ui/button';
 import { useBook } from '@/feature/book/book-context';
-import { MapPlaceholder } from '@/feature/book/components/map-placeholder';
+import { LocationMap } from '@/feature/book/components/location-map';
 import { WizardShell } from '@/feature/book/components/wizard-shell';
 import { SavedAddressChips } from '@/feature/saved-address/components/saved-address-chips';
 
@@ -23,7 +23,7 @@ export default function BookPickupScreen() {
         </Button>
       }
     >
-      <MapPlaceholder label={pickup.name} lat={pickup.lat} lng={pickup.lng} />
+      <LocationMap label={pickup.name} lat={pickup.lat} lng={pickup.lng} />
       <View className="px-6 py-4">
         <SavedAddressChips selected={pickup} onSelect={setPickup} />
       </View>

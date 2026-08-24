@@ -10,6 +10,7 @@ import { VStack } from '@/components/ui/vstack';
 import { useCurrentUserQuery } from '@/feature/user/user.query';
 import { axiosClient } from '@/lib/api/axios-client';
 import { clearSession } from '@/lib/auth/token-storage';
+import { useQueryClient } from '@tanstack/react-query';
 
 type SettingsRowProps = {
   icon: React.ReactNode;
@@ -44,6 +45,8 @@ export default function AccountPage() {
   const displayName = user?.customer?.name ?? 'Customer';
   const email = user?.email ?? '…';
 
+  const queryClient = useQueryClient();
+
   const onSignOut = async () => {
     setSigningOut(true);
     try {
@@ -52,6 +55,7 @@ export default function AccountPage() {
       // Clear local session even if the network call fails.
     } finally {
       await clearSession();
+      queryClient.clear(); // clear all caches before logout
       setSigningOut(false);
       router.replace('/(public)/login');
     }

@@ -80,12 +80,6 @@ func NewDispatchService(
 }
 
 func (s *dispatchService) CalculateArgo(ctx context.Context, req dto.CalculateArgoRequest) (dto.CalculateArgoResponse, error) {
-	vehicle, err := s.dispatchRepository.VehicleById(req.VehicleId)
-
-	if err != nil || vehicle == nil {
-		return dto.CalculateArgoResponse{}, err
-	}
-
 	pickupLat, pickupLng, err := parseLatLong(req.PickupLoc)
 	if err != nil {
 		return dto.CalculateArgoResponse{}, err
@@ -95,7 +89,7 @@ func (s *dispatchService) CalculateArgo(ctx context.Context, req dto.CalculateAr
 		return dto.CalculateArgoResponse{}, err
 	}
 
-	farePerDistance, err := farePerDistanceFor(vehicle.Type)
+	farePerDistance, err := farePerDistanceFor(req.VehicleType)
 	if err != nil {
 		return dto.CalculateArgoResponse{}, err
 	}
@@ -105,32 +99,11 @@ func (s *dispatchService) CalculateArgo(ctx context.Context, req dto.CalculateAr
 		return dto.CalculateArgoResponse{}, err
 	}
 
-	customer, ok := ctx.Value("customer").(entities.Customer)
-
-	if !ok {
-		return dto.CalculateArgoResponse{}, errors.New(dto.MESSAGE_CUSTOMER_NOT_FOUND_CTX)
-	}
-
 	distance := int(math.Round(route.Distance))
 	duration := int(math.Round(route.Duration))
 	base := int(math.Round(float64(distance) / 1000 * float64(farePerDistance)))
-	total := base + base*platformPercentage/100
-
-	err = s.dispatchRepository.PendingArgoTransaction(dto.PendingArgoTransaction{
-		CustomerID:         customer.ID,
-		VehicleID:          vehicle.ID,
-		PickupLatLong:      [2]string{formatCoord(pickupLat), formatCoord(pickupLng)},
-		LastLatLong:        [2]string{formatCoord(pickupLat), formatCoord(pickupLng)},
-		DestinationLatLong: [2]string{formatCoord(destLat), formatCoord(destLng)},
-		Distance:           distance,
-		FarePerDistance:    farePerDistance,
-		PlatformPercentage: platformPercentage,
-		TotalFare:          total,
-	})
-
-	if err != nil {
-		return dto.CalculateArgoResponse{}, err
-	}
+	platformFare := base * platformPercentage / 100
+	total := int(math.Ceil(float64(base + (platformFare))))
 
 	return dto.CalculateArgoResponse{
 		Distance:           distance,

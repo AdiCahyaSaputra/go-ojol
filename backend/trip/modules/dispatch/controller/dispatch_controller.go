@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/database/entities"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/service"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/validation"
@@ -46,7 +45,7 @@ func NewDispatchController(injector *do.Injector, s service.DispatchService) Dis
 
 func (c *dispatchController) CalculateArgo(ctx *gin.Context) {
 	var req dto.CalculateArgoRequest
-	if err := ctx.ShouldBind(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		res := utils.BuildResponseFailed(dto.MESSAGE_FAILED_GET_DATA_FROM_BODY, err.Error(), nil)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
@@ -58,13 +57,7 @@ func (c *dispatchController) CalculateArgo(ctx *gin.Context) {
 		return
 	}
 
-	reqCtx := context.WithValue(
-		ctx.Request.Context(),
-		"customer",
-		(ctx.MustGet("customer")).(entities.Customer),
-	)
-
-	result, err := c.dispatchService.CalculateArgo(reqCtx, req)
+	result, err := c.dispatchService.CalculateArgo(ctx.Request.Context(), req)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, service.ErrNoRoute) || errors.Is(err, service.ErrInvalidLatLong) || errors.Is(err, service.ErrUnknownVehicle) {

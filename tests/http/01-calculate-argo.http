@@ -17,15 +17,8 @@ Accept: application/json
 ###
 
 ###
-POST {{base_url}}/api/trip/dispatch/customer/calculate-argo HTTP/2.0
-Content-Type: application/json
+GET {{base_url}}/api/trip/dispatch/customer/calculate-argo?pickup_loc=-6.2088&pickup_loc=106.8456&destination=-6.1754&destination=106.8272&vehicle_type=car HTTP/2.0
 Accept: application/json
 Authorization: Bearer {{bearer_token}}
-
-{
-	"pickup_loc": ["-6.2088", "106.8456"],
-	"destination": ["-6.1754", "106.8272"],
-	"vehicle_id": "5bd64683-675b-4de7-ade3-e380e129c820"
-}
 ###
 

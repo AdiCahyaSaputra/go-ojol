@@ -24,14 +24,14 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 
 	dispatchCustomerRoutes := server.Group(constants.ROUTE_GROUP + "/dispatch/customer")
 	{
-		dispatchCustomerRoutes.POST("/calculate-argo",
+		dispatchCustomerRoutes.GET("/calculate-argo",
 			authenticate,
 			middlewares.ResolveProfileId(db), // customer_id lookup
 			middlewares.Authorize(
 				enforcer,
 				constants.ENUM_ROLE_CUSTOMER,
 				constants.ENUM_RESOURCE_DISPATCH,
-				constants.ENUM_ACTION_CREATE,
+				constants.ENUM_ACTION_READ,
 			),
 			dispatchController.CalculateArgo,
 		)

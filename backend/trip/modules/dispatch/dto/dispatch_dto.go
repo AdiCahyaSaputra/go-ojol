@@ -34,9 +34,9 @@ const (
 
 type (
 	CalculateArgoRequest struct {
-		PickupLoc   [2]string `json:"pickup_loc" binding:"required,len=2" validate:"required,latlong"`
-		Destination [2]string `json:"destination" binding:"required,len=2" validate:"required,latlong"`
-		VehicleId   uuid.UUID `json:"vehicle_id" binding:"required" validate:"required"`
+		PickupLoc   [2]string            `form:"pickup_loc" binding:"required,len=2" validate:"required,latlong"`
+		Destination [2]string            `form:"destination" binding:"required,len=2" validate:"required,latlong"`
+		VehicleType entities.VehicleType `form:"vehicle_type" binding:"required" validate:"required,vehicle_type"`
 	}
 
 	CalculateArgoResponse struct {

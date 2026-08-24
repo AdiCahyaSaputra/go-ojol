@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,10 +17,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const validCalculateArgoQuery = "/api/trip/dispatch/customer/calculate-argo?pickup_loc=-6.2088&pickup_loc=106.8456&destination=-6.1754&destination=106.8272&vehicle_type=motorcycle"
+
 func TestCalculateArgo_RequiresBearer(t *testing.T) {
 	router, _ := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", nil)
+	req := httptest.NewRequest(http.MethodGet, validCalculateArgoQuery, nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -31,9 +32,8 @@ func TestCalculateArgo_RequiresBearer(t *testing.T) {
 func TestCalculateArgo_RejectsInvalidToken(t *testing.T) {
 	router, _ := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{}`))
+	req := httptest.NewRequest(http.MethodGet, validCalculateArgoQuery, nil)
 	req.Header.Set("Authorization", "Bearer not-a-token")
-	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -42,15 +42,9 @@ func TestCalculateArgo_RejectsInvalidToken(t *testing.T) {
 
 func TestCalculateArgo_RejectsInvalidBody(t *testing.T) {
 	router, sign := newCalculateArgoRouter(t, http.NotFoundHandler(), true)
-	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{
-		"pickup_loc": ["1000", "106.8456"],
-		"destination": ["-6.1754", "106.8272"],
-		"vehicle_id": "`+vehicle.ID.String()+`"
-	}`))
+	req := httptest.NewRequest(http.MethodGet, "/api/trip/dispatch/customer/calculate-argo?pickup_loc=1000&pickup_loc=106.8456&destination=-6.1754&destination=106.8272&vehicle_type=motorcycle", nil)
 	req.Header.Set("Authorization", "Bearer "+sign("user-1", "user@example.com", "customer"))
-	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -73,15 +67,9 @@ func TestCalculateArgo_ReturnsQuote(t *testing.T) {
 		}`)
 	})
 	router, sign := newCalculateArgoRouter(t, osrm, true)
-	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{
-		"pickup_loc": ["-6.2088", "106.8456"],
-		"destination": ["-6.1754", "106.8272"],
-		"vehicle_id": "`+vehicle.ID.String()+`"
-	}`))
+	req := httptest.NewRequest(http.MethodGet, validCalculateArgoQuery, nil)
 	req.Header.Set("Authorization", "Bearer "+sign("user-1", "user@example.com", "customer"))
-	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -115,15 +103,9 @@ func TestCalculateArgo_NoRouteIsBadRequest(t *testing.T) {
 		_, _ = io.WriteString(w, `{"code":"NoRoute","routes":[]}`)
 	})
 	router, sign := newCalculateArgoRouter(t, osrm, true)
-	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{
-		"pickup_loc": ["-6.2088", "106.8456"],
-		"destination": ["-6.1754", "106.8272"],
-		"vehicle_id": "`+vehicle.ID.String()+`"
-	}`))
+	req := httptest.NewRequest(http.MethodGet, validCalculateArgoQuery, nil)
 	req.Header.Set("Authorization", "Bearer "+sign("user-1", "user@example.com", "customer"))
-	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -135,15 +117,9 @@ func TestCalculateArgo_OSRMDownIsBadGateway(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 	router, sign := newCalculateArgoRouter(t, osrm, true)
-	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{
-		"pickup_loc": ["-6.2088", "106.8456"],
-		"destination": ["-6.1754", "106.8272"],
-		"vehicle_id": "`+vehicle.ID.String()+`"
-	}`))
+	req := httptest.NewRequest(http.MethodGet, validCalculateArgoQuery, nil)
 	req.Header.Set("Authorization", "Bearer "+sign("user-1", "user@example.com", "customer"))
-	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -152,15 +128,9 @@ func TestCalculateArgo_OSRMDownIsBadGateway(t *testing.T) {
 
 func TestCalculateArgo_DeniesWhenUnauthorized(t *testing.T) {
 	router, sign := newCalculateArgoRouter(t, http.NotFoundHandler(), false)
-	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/trip/dispatch/customer/calculate-argo", bytes.NewBufferString(`{
-		"pickup_loc": ["-6.2088", "106.8456"],
-		"destination": ["-6.1754", "106.8272"],
-		"vehicle_id": "`+vehicle.ID.String()+`"
-	}`))
+	req := httptest.NewRequest(http.MethodGet, validCalculateArgoQuery, nil)
 	req.Header.Set("Authorization", "Bearer "+sign("user-1", "drv@example.com", "driver"))
-	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -187,15 +157,13 @@ func TestCalculateArgo_MotorcycleFareAndPath(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
-	repo := &stubDispatchRepo{vehicle: vehicle}
+	repo := &stubDispatchRepo{}
 	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
-	ctx := context.WithValue(context.Background(), "customer", testCustomer())
 
-	result, err := svc.CalculateArgo(ctx, dto.CalculateArgoRequest{
+	result, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
-		VehicleId:   vehicle.ID,
+		VehicleType: entities.VehicleTypeMotorcycle,
 	})
 	require.NoError(t, err)
 
@@ -226,15 +194,13 @@ func TestCalculateArgo_CarFare(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	vehicle := testVehicle(entities.VehicleTypeCar)
-	repo := &stubDispatchRepo{vehicle: vehicle}
+	repo := &stubDispatchRepo{}
 	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
-	ctx := context.WithValue(context.Background(), "customer", testCustomer())
 
-	result, err := svc.CalculateArgo(ctx, dto.CalculateArgoRequest{
+	result, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
-		VehicleId:   vehicle.ID,
+		VehicleType: entities.VehicleTypeCar,
 	})
 	require.NoError(t, err)
 
@@ -251,15 +217,13 @@ func TestCalculateArgo_NoRoute(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
-	repo := &stubDispatchRepo{vehicle: vehicle}
+	repo := &stubDispatchRepo{}
 	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
-	ctx := context.WithValue(context.Background(), "customer", testCustomer())
 
-	_, err := svc.CalculateArgo(ctx, dto.CalculateArgoRequest{
+	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
-		VehicleId:   vehicle.ID,
+		VehicleType: entities.VehicleTypeMotorcycle,
 	})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, service.ErrNoRoute))
@@ -271,15 +235,13 @@ func TestCalculateArgo_OSRMUnavailable(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
-	repo := &stubDispatchRepo{vehicle: vehicle}
+	repo := &stubDispatchRepo{}
 	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
-	ctx := context.WithValue(context.Background(), "customer", testCustomer())
 
-	_, err := svc.CalculateArgo(ctx, dto.CalculateArgoRequest{
+	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
-		VehicleId:   vehicle.ID,
+		VehicleType: entities.VehicleTypeMotorcycle,
 	})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, service.ErrOSRMUnavailable))
@@ -291,15 +253,13 @@ func TestCalculateArgo_InvalidJSONFromOSRM(t *testing.T) {
 	}))
 	t.Cleanup(osrm.Close)
 
-	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
-	repo := &stubDispatchRepo{vehicle: vehicle}
+	repo := &stubDispatchRepo{}
 	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
-	ctx := context.WithValue(context.Background(), "customer", testCustomer())
 
-	_, err := svc.CalculateArgo(ctx, dto.CalculateArgoRequest{
+	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
 		Destination: [2]string{"-6.1754", "106.8272"},
-		VehicleId:   vehicle.ID,
+		VehicleType: entities.VehicleTypeMotorcycle,
 	})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, service.ErrOSRMUnavailable))

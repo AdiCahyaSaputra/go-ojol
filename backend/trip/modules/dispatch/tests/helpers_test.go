@@ -169,16 +169,15 @@ func newCalculateArgoRouter(t *testing.T, osrmHandler http.Handler, allow bool) 
 	verifier, sign := newTestSigner(t)
 	injector := newTestInjector(t)
 
-	vehicle := testVehicle(entities.VehicleTypeMotorcycle)
-	repo := &stubDispatchRepo{vehicle: vehicle}
+	repo := &stubDispatchRepo{}
 	dispatchSvc := service.NewDispatchService(repo, nil, osrmServer.Client(), osrmServer.URL, nil)
 	dispatchCtrl := controller.NewDispatchController(injector, dispatchSvc)
 
 	router := gin.New()
-	router.POST(
+	router.GET(
 		"/api/trip/dispatch/customer/calculate-argo",
 		middlewares.Authenticate(verifier, session.AlwaysActive()),
-		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_CREATE),
+		middlewares.Authorize(&stubEnforcer{allow: allow}, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),
 		injectCustomer(),
 		dispatchCtrl.CalculateArgo,
 	)

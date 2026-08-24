@@ -1,5 +1,7 @@
 # Security audit fixes (2026-08-24)
-# Run against gateway with auth + trip services. Select the `dev` env in Kulala.
+# Run against gateway with auth + trip from branch fix/security-audit-2026-08-24
+# (restart both services from .worktrees/security — stale trip binaries skip H1/M1).
+# Select the `dev` env in Kulala.
 #
 # Covers:
 #   H1 — trip rejects JWT after session logout
@@ -40,12 +42,18 @@ Authorization: Bearer {{security_access_token}}
 ###
 
 ### TRIP_QUERY_TOKEN_SHOULD_FAIL
-# M1: ?token= must not authenticate (Bearer-only)
+# M1: ?token= must not authenticate (Bearer-only).
+# Drop leftover Authorization from the previous request — Kulala reuses it otherwise.
+< {%
+  try { request.headers.remove("Authorization"); } catch (e) {}
+  try { request.headers.delete("Authorization"); } catch (e) {}
+%}
 GET {{base_url}}/api/trip/protected?token={{security_access_token}} HTTP/1.1
 Accept: application/json
+Authorization:
 
 > {%
-  client.assert(response.status === 401, "expected 401 for query-string token");
+  client.assert(response.status === 401, "expected 401 for query-string token, got " + response.status);
 %}
 
 ###
@@ -68,7 +76,7 @@ Accept: application/json
 Authorization: Bearer {{security_access_token}}
 
 > {%
-  client.assert(response.status === 401, "expected 401 on trip after session revoke");
+  client.assert(response.status === 401, "expected 401 on trip after session revoke, got " + response.status);
 %}
 
 ###
@@ -111,7 +119,8 @@ Accept: application/json
 Authorization: Bearer {{admin_access_token}}
 
 > {%
-  client.assert(response.status === 400, "expected 400 deleting unknown user id");
+  client.assert(response.status === 400, "expected 400 deleting unknown user id, got " + response.status);
+  client.assert(response.body.error === "user not found", "expected user not found");
 %}
 
 ###
@@ -122,9 +131,9 @@ Accept: application/json
 Authorization: Bearer {{admin_access_token}}
 
 > {%
-  client.assert(response.status === 200, "admin must still exist after DELETE on another id");
+  client.assert(response.status === 200, "admin must still exist after DELETE on another id, got " + response.status);
   client.assert(
-    response.body.data.id === client.global.get("admin_user_id"),
+    String(response.body.data.id) === String(client.global.get("admin_user_id")),
     "admin id unchanged"
   );
 %}

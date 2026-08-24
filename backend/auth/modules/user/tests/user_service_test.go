@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/repository"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/auth/modules/user/service"
 	"github.com/google/uuid"
@@ -145,4 +146,12 @@ func TestUserService_DeleteRemovesTargetUser(t *testing.T) {
 
 	_, err = svc.GetUserById(context.Background(), adminID.String())
 	require.NoError(t, err)
+}
+
+func TestUserService_DeleteMissingUserReturnsNotFound(t *testing.T) {
+	db := setupUserTestDB(t)
+	svc := service.NewUserService(repository.NewUserRepository(db), db)
+
+	err := svc.Delete(context.Background(), uuid.New().String())
+	assert.ErrorIs(t, err, dto.ErrUserNotFound)
 }

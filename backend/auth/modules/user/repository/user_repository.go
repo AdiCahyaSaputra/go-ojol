@@ -154,8 +154,12 @@ func (r *userRepository) Delete(ctx context.Context, tx *gorm.DB, userId string)
 		tx = r.db
 	}
 
-	if err := tx.WithContext(ctx).Delete(&entities.User{}, "id = ?", userId).Error; err != nil {
-		return err
+	result := tx.WithContext(ctx).Delete(&entities.User{}, "id = ?", userId)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
 	}
 
 	return nil

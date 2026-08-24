@@ -113,13 +113,17 @@ func loginRateLimit(l *LoginRateLimiter) gin.HandlerFunc {
 		ctx.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 		ctx.Next()
 
-		if ctx.Writer.Status() == http.StatusOK {
+		status := ctx.Writer.Status()
+		if status == http.StatusOK {
 			if email != "" {
 				l.Reset(key)
 			}
 			return
 		}
-		if ctx.GetBool("login_failed") && email != "" {
+		if status == http.StatusTooManyRequests {
+			return
+		}
+		if email != "" {
 			l.RecordFailure(key)
 		}
 	}

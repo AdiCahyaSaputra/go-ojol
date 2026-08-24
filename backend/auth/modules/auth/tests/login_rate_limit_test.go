@@ -20,7 +20,6 @@ func TestLoginRateLimit_BlocksAfterFourFailures(t *testing.T) {
 	limiter := middlewares.NewLoginRateLimiter()
 	router := gin.New()
 	router.POST("/login", middlewares.LoginRateLimitWith(limiter), func(ctx *gin.Context) {
-		ctx.Set("login_failed", true)
 		ctx.JSON(http.StatusBadRequest, gin.H{"status": false})
 	})
 

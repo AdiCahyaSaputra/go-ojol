@@ -100,9 +100,6 @@ func (c *authController) Login(ctx *gin.Context) {
 		IP:        ctx.ClientIP(),
 	})
 	if err != nil {
-		if errors.Is(err, dto.ErrInvalidCredentials) || errors.Is(err, userDto.ErrEmailNotFound) {
-			ctx.Set("login_failed", true)
-		}
 		res := utils.BuildResponseFailed(userDto.MESSAGE_FAILED_LOGIN, utils.ClientErrorMessage(err,
 			dto.ErrInvalidCredentials,
 			userDto.ErrEmailNotFound,

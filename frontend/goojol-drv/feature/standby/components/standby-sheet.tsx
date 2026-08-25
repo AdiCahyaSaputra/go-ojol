@@ -3,7 +3,7 @@ import { Button, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
-import { useStandby } from '@/feature/standby/standby-context';
+import { formatOfferCoord, useStandby } from '@/feature/standby/standby-context';
 
 function formatRupiah(amount: number) {
   return new Intl.NumberFormat('id-ID', {
@@ -23,7 +23,6 @@ export function StandbySheet() {
     error,
     goOnline,
     goOffline,
-    simulateOffer,
     acceptOffer,
     rejectOffer,
     completeTrip,
@@ -74,26 +73,16 @@ export function StandbySheet() {
                 <Text className="text-goojol-muted text-sm">Waiting for nearby trip requests.</Text>
               </VStack>
             </HStack>
-            <HStack className="gap-3">
-              <Button
-                variant="outline"
-                className="flex-1 border-goojol-border bg-goojol-surface"
-                onPress={goOffline}
-                isDisabled={isBusy}
-                accessibilityLabel="Go offline"
-              >
-                {isBusy ? <ButtonSpinner /> : null}
-                <ButtonText className="font-semibold text-white">Go offline</ButtonText>
-              </Button>
-              <Button
-                className="flex-1 bg-goojol-surface data-[active=true]:bg-goojol-border"
-                onPress={simulateOffer}
-                isDisabled={isBusy}
-                accessibilityLabel="Simulate order"
-              >
-                <ButtonText className="font-semibold text-goojol-coral">Simulate order</ButtonText>
-              </Button>
-            </HStack>
+            <Button
+              variant="outline"
+              className="w-full border-goojol-border bg-goojol-surface"
+              onPress={goOffline}
+              isDisabled={isBusy}
+              accessibilityLabel="Go offline"
+            >
+              {isBusy ? <ButtonSpinner /> : null}
+              <ButtonText className="font-semibold text-white">Go offline</ButtonText>
+            </Button>
           </>
         )}
 
@@ -112,14 +101,14 @@ export function StandbySheet() {
             <HStack className="items-start justify-between gap-3">
               <VStack className="min-w-0 flex-1">
                 <Text className="text-goojol-muted text-xs">Pickup</Text>
-                <Text className="text-base text-white" numberOfLines={1}>
-                  {offer.pickup.name}
+                <Text className="text-base text-white" numberOfLines={2}>
+                  {formatOfferCoord(offer.pickup)}
                 </Text>
               </VStack>
               <VStack className="min-w-0 flex-1 items-end">
                 <Text className="text-goojol-muted text-xs">Drop-off</Text>
-                <Text className="text-right text-base text-white" numberOfLines={1}>
-                  {offer.destination.name}
+                <Text className="text-right text-base text-white" numberOfLines={2}>
+                  {formatOfferCoord(offer.destination)}
                 </Text>
               </VStack>
             </HStack>
@@ -138,15 +127,19 @@ export function StandbySheet() {
                 variant="outline"
                 className="flex-1 border-goojol-border bg-goojol-surface"
                 onPress={rejectOffer}
+                isDisabled={isBusy}
                 accessibilityLabel="Reject offer"
               >
+                {isBusy ? <ButtonSpinner /> : null}
                 <ButtonText className="font-semibold text-red-600">Reject</ButtonText>
               </Button>
               <Button
                 className="flex-1 bg-goojol-coral data-[active=true]:bg-goojol-coral/90"
                 onPress={acceptOffer}
+                isDisabled={isBusy}
                 accessibilityLabel="Accept offer"
               >
+                {isBusy ? <ButtonSpinner /> : null}
                 <ButtonText className="font-semibold text-white">Accept</ButtonText>
               </Button>
             </HStack>
@@ -158,14 +151,14 @@ export function StandbySheet() {
             <VStack space="xs">
               <Text className="font-semibold text-lg text-white">Head to pickup</Text>
               <Text className="text-goojol-muted text-sm">
-                Navigate to {offer.pickup.name}. Mock trip - complete when ready.
+                Navigate to the pickup point. Complete when ready.
               </Text>
             </VStack>
             <HStack className="items-start justify-between gap-3">
               <VStack className="min-w-0 flex-1">
                 <Text className="text-goojol-muted text-xs">Pickup</Text>
-                <Text className="text-base text-white" numberOfLines={1}>
-                  {offer.pickup.name}
+                <Text className="text-base text-white" numberOfLines={2}>
+                  {formatOfferCoord(offer.pickup)}
                 </Text>
               </VStack>
               <VStack className="min-w-0 flex-1 items-end">
@@ -178,7 +171,7 @@ export function StandbySheet() {
             <Button
               className="w-full bg-goojol-coral data-[active=true]:bg-goojol-coral/90"
               onPress={completeTrip}
-              accessibilityLabel="Complete mock trip"
+              accessibilityLabel="Complete trip"
             >
               <ButtonText className="font-semibold text-white">Complete</ButtonText>
             </Button>

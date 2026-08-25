@@ -8,38 +8,43 @@ import {
   useRef,
   useState,
 } from 'react';
-import { LOCATION_HEARTBEAT_MS, MOCK_OFFER, OFFER_COUNTDOWN_SEC } from '@/constants/standby';
+import { LOCATION_HEARTBEAT_MS } from '@/constants/standby';
 import { getSession } from '@/lib/auth/token-storage';
 import { type DriverCoords, resolveDriverLocation } from './location';
-import { setDriverMode } from './standby.service';
-import { StandbySocket } from './standby-ws';
+import { respondOffer, setDriverMode } from './standby.service';
+import { StandbySocket, type TripOffer } from './standby-ws';
 
 export type StandbyPhase = 'offline' | 'online' | 'offer' | 'accepted';
-
-export type MockOffer = typeof MOCK_OFFER;
 
 type StandbyContextValue = {
   phase: StandbyPhase;
   coords: DriverCoords | null;
-  offer: MockOffer | null;
+  offer: TripOffer | null;
   offerSecondsLeft: number;
   isBusy: boolean;
   error: string | null;
   goOnline: () => Promise<void>;
   goOffline: () => Promise<void>;
-  simulateOffer: () => void;
-  acceptOffer: () => void;
-  rejectOffer: () => void;
+  acceptOffer: () => Promise<void>;
+  rejectOffer: () => Promise<void>;
   completeTrip: () => Promise<void>;
   clearError: () => void;
 };
 
 const StandbyContext = createContext<StandbyContextValue | null>(null);
 
+function formatCoordPair(coords: [number, number]) {
+  return `${coords[0].toFixed(5)}, ${coords[1].toFixed(5)}`;
+}
+
+export function formatOfferCoord(coords: [number, number]) {
+  return formatCoordPair(coords);
+}
+
 export function StandbyProvider({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<StandbyPhase>('offline');
   const [coords, setCoords] = useState<DriverCoords | null>(null);
-  const [offer, setOffer] = useState<MockOffer | null>(null);
+  const [offer, setOffer] = useState<TripOffer | null>(null);
   const [offerSecondsLeft, setOfferSecondsLeft] = useState(0);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,10 +53,15 @@ export function StandbyProvider({ children }: { children: ReactNode }) {
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseRef = useRef(phase);
+  const offerRef = useRef<TripOffer | null>(null);
 
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
+
+  useEffect(() => {
+    offerRef.current = offer;
+  }, [offer]);
 
   const clearHeartbeat = useCallback(() => {
     if (heartbeatRef.current) {
@@ -67,6 +77,32 @@ export function StandbyProvider({ children }: { children: ReactNode }) {
     }
     setOfferSecondsLeft(0);
   }, []);
+
+  const clearActiveOffer = useCallback(() => {
+    clearCountdown();
+    setOffer(null);
+  }, [clearCountdown]);
+
+  const startOfferCountdown = useCallback(
+    (expiresInSec: number) => {
+      clearCountdown();
+      setOfferSecondsLeft(expiresInSec);
+      countdownRef.current = setInterval(() => {
+        setOfferSecondsLeft((prev) => {
+          if (prev <= 1) {
+            clearCountdown();
+            if (phaseRef.current === 'offer') {
+              setOffer(null);
+              setPhase('online');
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    },
+    [clearCountdown],
+  );
 
   const disconnectSocket = useCallback(() => {
     clearHeartbeat();
@@ -92,8 +128,7 @@ export function StandbyProvider({ children }: { children: ReactNode }) {
   const goOffline = useCallback(async () => {
     setIsBusy(true);
     setError(null);
-    clearCountdown();
-    setOffer(null);
+    clearActiveOffer();
 
     const current = coords ?? (await resolveDriverLocation());
     disconnectSocket();
@@ -106,7 +141,7 @@ export function StandbyProvider({ children }: { children: ReactNode }) {
       setPhase('offline');
       setIsBusy(false);
     }
-  }, [clearCountdown, coords, disconnectSocket]);
+  }, [clearActiveOffer, coords, disconnectSocket]);
 
   const goOnline = useCallback(async () => {
     setIsBusy(true);
@@ -145,9 +180,42 @@ export function StandbyProvider({ children }: { children: ReactNode }) {
 
         socket.connect(session.accessToken, {
           onStandbyOk: succeed,
-          onError: fail,
+          onTripOffer: (nextOffer) => {
+            if (phaseRef.current !== 'online') {
+              return;
+            }
+            setOffer(nextOffer);
+            setPhase('offer');
+            startOfferCountdown(nextOffer.expiresInSec);
+          },
+          onOfferTaken: (transactionId) => {
+            if (offerRef.current?.transactionId !== transactionId) {
+              return;
+            }
+            if (phaseRef.current === 'offer') {
+              clearActiveOffer();
+              setPhase('online');
+            }
+          },
+          onOfferExpired: (transactionId) => {
+            if (offerRef.current?.transactionId !== transactionId) {
+              return;
+            }
+            if (phaseRef.current === 'offer') {
+              clearActiveOffer();
+              setPhase('online');
+            }
+          },
+          onError: (message) => {
+            if (!settled) {
+              fail(message);
+              return;
+            }
+            setError(message);
+          },
           onClose: () => {
             if (phaseRef.current !== 'offline') {
+              clearActiveOffer();
               setPhase('offline');
               clearHeartbeat();
               setError('Connection lost. You are offline.');
@@ -180,47 +248,61 @@ export function StandbyProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsBusy(false);
     }
-  }, [clearHeartbeat, coords, disconnectSocket, startHeartbeat]);
+  }, [
+    clearActiveOffer,
+    clearHeartbeat,
+    coords,
+    disconnectSocket,
+    startHeartbeat,
+    startOfferCountdown,
+  ]);
 
-  const simulateOffer = useCallback(() => {
-    if (phaseRef.current !== 'online') {
+  const acceptOffer = useCallback(async () => {
+    const current = offerRef.current;
+    if (!current || phaseRef.current !== 'offer') {
       return;
     }
-    clearCountdown();
-    setOffer(MOCK_OFFER);
-    setOfferSecondsLeft(OFFER_COUNTDOWN_SEC);
-    setPhase('offer');
 
-    countdownRef.current = setInterval(() => {
-      setOfferSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearCountdown();
-          setOffer(null);
-          setPhase('online');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [clearCountdown]);
+    setIsBusy(true);
+    setError(null);
+    try {
+      await respondOffer({ transactionId: current.transactionId, action: 'accept' });
+      clearCountdown();
+      setPhase('accepted');
+    } catch (err) {
+      clearActiveOffer();
+      setPhase('online');
+      setError(err instanceof Error ? err.message : 'Could not accept offer');
+    } finally {
+      setIsBusy(false);
+    }
+  }, [clearActiveOffer, clearCountdown]);
 
-  const acceptOffer = useCallback(() => {
-    clearCountdown();
-    setPhase('accepted');
-  }, [clearCountdown]);
+  const rejectOffer = useCallback(async () => {
+    const current = offerRef.current;
+    if (!current || phaseRef.current !== 'offer') {
+      return;
+    }
 
-  const rejectOffer = useCallback(() => {
-    clearCountdown();
-    setOffer(null);
-    setPhase('online');
-  }, [clearCountdown]);
+    setIsBusy(true);
+    setError(null);
+    try {
+      await respondOffer({ transactionId: current.transactionId, action: 'reject' });
+      clearActiveOffer();
+      setPhase('online');
+    } catch (err) {
+      clearActiveOffer();
+      setPhase('online');
+      setError(err instanceof Error ? err.message : 'Could not reject offer');
+    } finally {
+      setIsBusy(false);
+    }
+  }, [clearActiveOffer]);
 
   const completeTrip = useCallback(async () => {
-    clearCountdown();
-    setOffer(null);
+    clearActiveOffer();
     setPhase('online');
-    // Stay online after mock trip; heartbeat continues.
-  }, [clearCountdown]);
+  }, [clearActiveOffer]);
 
   useEffect(() => {
     return () => {
@@ -239,7 +321,6 @@ export function StandbyProvider({ children }: { children: ReactNode }) {
       error,
       goOnline,
       goOffline,
-      simulateOffer,
       acceptOffer,
       rejectOffer,
       completeTrip,
@@ -254,7 +335,6 @@ export function StandbyProvider({ children }: { children: ReactNode }) {
       error,
       goOnline,
       goOffline,
-      simulateOffer,
       acceptOffer,
       rejectOffer,
       completeTrip,

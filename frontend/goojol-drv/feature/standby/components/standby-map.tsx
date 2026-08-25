@@ -11,12 +11,12 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 import { DEFAULT_LOCATION } from '@/constants/standby';
 import { OSM_RASTER_STYLE } from '@/feature/standby/constants/osm-raster-style';
-import type { MockOffer } from '@/feature/standby/standby-context';
+import type { TripOffer } from '@/feature/standby/standby-ws';
 
 type StandbyMapProps = {
   lat: number;
   lng: number;
-  offer: MockOffer | null;
+  offer: TripOffer | null;
   showRoute: boolean;
   padding?: { top: number; right: number; bottom: number; left: number };
 };
@@ -32,12 +32,9 @@ export function StandbyMap({ lat, lng, offer, showRoute, padding }: StandbyMapPr
     if (!offer || !showRoute) {
       return null;
     }
-    if (offer.path.length >= 2) {
-      return offer.path.map(([pathLat, pathLng]) => toLngLat(pathLat, pathLng));
-    }
     return [
-      toLngLat(offer.pickup.lat, offer.pickup.lng),
-      toLngLat(offer.destination.lat, offer.destination.lng),
+      toLngLat(offer.pickup[0], offer.pickup[1]),
+      toLngLat(offer.destination[0], offer.destination[1]),
     ];
   }, [offer, showRoute]);
 
@@ -62,8 +59,8 @@ export function StandbyMap({ lat, lng, offer, showRoute, padding }: StandbyMapPr
 
     const points: [number, number][] = [
       driverLngLat,
-      toLngLat(offer.pickup.lat, offer.pickup.lng),
-      toLngLat(offer.destination.lat, offer.destination.lng),
+      toLngLat(offer.pickup[0], offer.pickup[1]),
+      toLngLat(offer.destination[0], offer.destination[1]),
     ];
     if (routeCoordinates) {
       points.push(...routeCoordinates);
@@ -162,13 +159,13 @@ export function StandbyMap({ lat, lng, offer, showRoute, padding }: StandbyMapPr
 
         {offer ? (
           <>
-            <ViewAnnotation lngLat={toLngLat(offer.pickup.lat, offer.pickup.lng)} anchor="bottom">
+            <ViewAnnotation lngLat={toLngLat(offer.pickup[0], offer.pickup[1])} anchor="bottom">
               <View className="rounded-full border-2 border-white bg-goojol-coral p-1.5">
                 <MapPinHouse color="#ffffff" size={16} />
               </View>
             </ViewAnnotation>
             <ViewAnnotation
-              lngLat={toLngLat(offer.destination.lat, offer.destination.lng)}
+              lngLat={toLngLat(offer.destination[0], offer.destination[1])}
               anchor="bottom"
             >
               <View className="rounded-full border-2 border-white bg-goojol-teal p-1.5">

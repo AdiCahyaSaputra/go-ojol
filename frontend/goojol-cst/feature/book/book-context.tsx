@@ -1,6 +1,6 @@
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 import { DEFAULT_PICKUP } from '@/constants/book';
-import type { BookLocation, CalculateArgoResponse, NearbyDriver } from './dispatch.schema';
+import type { BookLocation, CalculateArgoResponse, MatchedDriver } from './dispatch.schema';
 
 type VehicleType = 'car' | 'motorcycle';
 
@@ -10,12 +10,14 @@ type BookContextValue = {
   vehicleType: VehicleType;
   vehicleMaxSize: number;
   quote: CalculateArgoResponse | null;
-  matchedDriver: NearbyDriver | null;
+  matchedDriver: MatchedDriver | null;
+  transactionId: string | null;
   setPickup: (location: BookLocation) => void;
   setDestination: (location: BookLocation) => void;
   setVehicleOption: (option: { vehicleType: VehicleType; maxSize: number }) => void;
   setQuote: (quote: CalculateArgoResponse | null) => void;
-  setMatchedDriver: (driver: NearbyDriver | null) => void;
+  setMatchedDriver: (driver: MatchedDriver | null) => void;
+  setTransactionId: (transactionId: string | null) => void;
   reset: () => void;
 };
 
@@ -27,7 +29,8 @@ export function BookProvider({ children }: { children: ReactNode }) {
   const [vehicleType, setVehicleType] = useState<VehicleType>('motorcycle');
   const [vehicleMaxSize, setVehicleMaxSize] = useState(1);
   const [quote, setQuoteState] = useState<CalculateArgoResponse | null>(null);
-  const [matchedDriver, setMatchedDriverState] = useState<NearbyDriver | null>(null);
+  const [matchedDriver, setMatchedDriverState] = useState<MatchedDriver | null>(null);
+  const [transactionId, setTransactionIdState] = useState<string | null>(null);
 
   const setPickup = useCallback((location: BookLocation) => {
     setPickupState(location);
@@ -49,6 +52,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
     setVehicleMaxSize(1);
     setQuoteState(null);
     setMatchedDriverState(null);
+    setTransactionIdState(null);
   }, []);
 
   const value = useMemo<BookContextValue>(
@@ -59,11 +63,13 @@ export function BookProvider({ children }: { children: ReactNode }) {
       vehicleMaxSize,
       quote,
       matchedDriver,
+      transactionId,
       setPickup,
       setDestination,
       setVehicleOption,
       setQuote: setQuoteState,
       setMatchedDriver: setMatchedDriverState,
+      setTransactionId: setTransactionIdState,
       reset,
     }),
     [
@@ -73,6 +79,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
       vehicleMaxSize,
       quote,
       matchedDriver,
+      transactionId,
       setPickup,
       setDestination,
       setVehicleOption,

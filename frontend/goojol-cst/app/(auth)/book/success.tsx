@@ -41,7 +41,7 @@ export default function BookSuccessScreen() {
               Driver found!
             </Heading>
             <Text className="text-center text-goojol-muted">
-              Your demo ride ends here — trip tracking comes in a later phase.
+              Your driver accepted the trip and is heading to the pickup.
             </Text>
           </VStack>
         </VStack>
@@ -49,12 +49,12 @@ export default function BookSuccessScreen() {
         {matchedDriver ? (
           <View className="mt-8 rounded-2xl border border-goojol-border bg-goojol-surface p-4">
             <VStack space="sm">
-              <Text className="font-semibold text-lg text-white">{matchedDriver.profile.name}</Text>
+              <Text className="font-semibold text-lg text-white">{matchedDriver.name}</Text>
               <Text className="text-goojol-muted">
-                {matchedDriver.profile.vehicle_name} · {matchedDriver.profile.license_number}
+                {matchedDriver.vehicle_name} · {matchedDriver.license_number}
               </Text>
               <Text className="text-goojol-muted">
-                {matchedDriver.distance_m} m away · {matchedDriver.profile.type}
+                {matchedDriver.phone_number} · {matchedDriver.vehicle_type}
               </Text>
               {selectedFare != null ? (
                 <Text className="mt-2 text-goojol-teal">

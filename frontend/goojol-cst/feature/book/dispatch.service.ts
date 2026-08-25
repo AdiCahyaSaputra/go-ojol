@@ -13,7 +13,9 @@ type CalculateArgoInput = {
 
 type FindDriverInput = {
   pickup: BookLocation;
+  destination: BookLocation;
   vehicleType: 'car' | 'motorcycle';
+  maxSize: number;
 };
 
 export async function calculateArgo(input: CalculateArgoInput) {
@@ -32,8 +34,10 @@ export async function calculateArgo(input: CalculateArgoInput) {
 
 export async function findDriver(input: FindDriverInput) {
   const response = await axiosClient.post('/api/trip/dispatch/customer/find-driver', {
-    current_lat_long: [input.pickup.lat, input.pickup.lng],
+    pickup_lat_long: [input.pickup.lat, input.pickup.lng],
+    destination_lat_long: [input.destination.lat, input.destination.lng],
     vehicle_type: input.vehicleType,
+    max_size: input.maxSize,
   });
 
   return parsedApiResponse(findDriverResponseSchema, response).data;

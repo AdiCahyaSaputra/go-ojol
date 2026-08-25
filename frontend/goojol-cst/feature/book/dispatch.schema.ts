@@ -46,7 +46,22 @@ export const nearbyDriverSchema = z.object({
 export type NearbyDriver = z.infer<typeof nearbyDriverSchema>;
 
 export const findDriverResponseSchema = z.object({
+  transaction_id: z.string().optional(),
+  expires_in_sec: z.number().optional(),
   drivers: z.array(nearbyDriverSchema),
 });
 
 export type FindDriverResponse = z.infer<typeof findDriverResponseSchema>;
+
+export const matchedDriverSchema = z.object({
+  user_id: z.string(),
+  driver_id: z.string(),
+  name: z.string(),
+  phone_number: z.string(),
+  vehicle_id: z.string(),
+  vehicle_name: z.string(),
+  license_number: z.string(),
+  vehicle_type: z.string(),
+});
+
+export type MatchedDriver = z.infer<typeof matchedDriverSchema>;

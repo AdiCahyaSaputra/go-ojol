@@ -105,7 +105,7 @@ func TestSetDriverMode_DeniesWhenUnauthorized(t *testing.T) {
 
 func TestSetDriverModeService_Online(t *testing.T) {
 	store := newGeoStore(t)
-	svc := service.NewDispatchService(nil, nil, nil, "", store)
+	svc := service.NewDispatchService(nil, nil, nil, "", store, nil)
 	ctx := context.WithValue(context.Background(), "user_id", "drv-1")
 
 	err := svc.SetDriverMode(ctx, dto.SetDriverModeRequest{
@@ -126,7 +126,7 @@ func TestSetDriverModeService_Offline(t *testing.T) {
 	store := newGeoStore(t)
 	require.NoError(t, store.SetStandby(context.Background(), "drv-1", -6.2088, 106.8456))
 
-	svc := service.NewDispatchService(nil, nil, nil, "", store)
+	svc := service.NewDispatchService(nil, nil, nil, "", store, nil)
 	ctx := context.WithValue(context.Background(), "user_id", "drv-1")
 
 	err := svc.SetDriverMode(ctx, dto.SetDriverModeRequest{
@@ -142,7 +142,7 @@ func TestSetDriverModeService_Offline(t *testing.T) {
 
 func TestSetDriverModeService_InvalidLatLong(t *testing.T) {
 	store := newGeoStore(t)
-	svc := service.NewDispatchService(nil, nil, nil, "", store)
+	svc := service.NewDispatchService(nil, nil, nil, "", store, nil)
 	ctx := context.WithValue(context.Background(), "user_id", "drv-1")
 
 	err := svc.SetDriverMode(ctx, dto.SetDriverModeRequest{

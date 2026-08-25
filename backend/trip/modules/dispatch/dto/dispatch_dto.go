@@ -23,6 +23,14 @@ const (
 	MESSAGE_DRIVE_USER_ID_CONTEXT_NOT_FOUND = "can't find user_id in driver context"
 	MESSAGE_SET_DRIVER_MODE_FAILED          = "set mode for driver failed"
 	MESSAGE_SET_DRIVER_MODE_SUCCESS         = "set mode for driver success"
+
+	MESSAGE_SUCCESS_RESPOND_OFFER = "success respond offer"
+	MESSAGE_FAILED_RESPOND_OFFER  = "failed respond offer"
+	MESSAGE_DRIVER_NOT_FOUND_CTX  = "profile driver is not resolved in the context"
+	MESSAGE_OFFER_NOT_FOUND       = "offer not found"
+	MESSAGE_OFFER_UNAVAILABLE     = "offer no longer available"
+	MESSAGE_INVALID_OFFER_ACTION  = "action must be accept or reject"
+	MESSAGE_NOT_OFFERED_DRIVER    = "driver was not offered this trip"
 )
 
 type DriverMode string
@@ -31,6 +39,15 @@ const (
 	DriverModeOnline  = "online"
 	DriverModeOffline = "offline"
 )
+
+type OfferAction string
+
+const (
+	OfferActionAccept OfferAction = "accept"
+	OfferActionReject OfferAction = "reject"
+)
+
+const OfferTTLSeconds = 30
 
 type (
 	CalculateArgoRequest struct {
@@ -58,12 +75,16 @@ type (
 	}
 
 	FindDriverRequest struct {
-		CurrentLatLong [2]string            `json:"current_lat_long" form:"current_location" binding:"required,len=2" validate:"required,latlong"`
-		VehicleType    entities.VehicleType `json:"vehicle_type" binding:"required" validate:"required,vehicle_type"`
+		PickupLatLong      [2]string            `json:"pickup_lat_long" binding:"required,len=2" validate:"required,latlong"`
+		DestinationLatLong [2]string            `json:"destination_lat_long" binding:"required,len=2" validate:"required,latlong"`
+		VehicleType        entities.VehicleType `json:"vehicle_type" binding:"required" validate:"required,vehicle_type"`
+		MaxSize            int                  `json:"max_size" binding:"required,min=1" validate:"required,min=1"`
 	}
 
 	FindDriverResponse struct {
-		Drivers []NearbyDriver `json:"drivers"`
+		TransactionID *uuid.UUID     `json:"transaction_id,omitempty"`
+		ExpiresInSec  int            `json:"expires_in_sec,omitempty"`
+		Drivers       []NearbyDriver `json:"drivers"`
 	}
 
 	NearbyDriverProfile struct {
@@ -86,22 +107,30 @@ type (
 		Profile   NearbyDriverProfile `json:"profile"`
 	}
 
-	PendingArgoTransaction struct {
-		CustomerID uuid.UUID `json:"customer_id"`
-		VehicleID  uuid.UUID `json:"vehicle_id"`
+	CreateOfferedTransaction struct {
+		CustomerID uuid.UUID
 
-		PickupLatLong      [2]string `json:"pickup_lat_long"`
-		DestinationLatLong [2]string `json:"destination_lat_long"`
-		LastLatLong        [2]string `json:"last_lat_long"` // Using pickup long by default
+		PickupLatLong      [2]string
+		DestinationLatLong [2]string
+		LastLatLong        [2]string
 
-		Distance           int `json:"distance"`
-		FarePerDistance    int `json:"fare_per_distance"`
-		PlatformPercentage int `json:"platform_percentage"`
-		TotalFare          int `json:"total_fare"`
+		Distance           int
+		FarePerDistance    int
+		PlatformPercentage int
+		TotalFare          int
 	}
 
 	SetDriverModeRequest struct {
 		Mode           DriverMode `json:"mode" validate:"required,driver_mode"`
 		CurrentLatLong [2]string  `json:"current_lat_long" validate:"required,latlong"`
+	}
+
+	RespondOfferRequest struct {
+		Action OfferAction `json:"action" validate:"required,offer_action"`
+	}
+
+	RespondOfferResponse struct {
+		TransactionID uuid.UUID                   `json:"transaction_id"`
+		Status        entities.TransactionStatus  `json:"status"`
 	}
 )

@@ -59,6 +59,11 @@ func RegisterDependencies(injector *do.Injector) {
 	rdb := do.MustInvokeNamed[*redis.Client](injector, constants.Redis)
 	locations := drivergeo.NewStore(rdb)
 
+	wsSvc := dispatchwsService.NewDispatchWSService(locations)
+	do.Provide(injector, func(i *do.Injector) (dispatchwsController.DispatchWSController, error) {
+		return dispatchwsController.NewDispatchWSController(wsSvc), nil
+	})
+
 	dispatchRepo := dispatchRepository.NewDispatchRepository(db)
 	dispatchSvc := dispatchService.NewDispatchService(
 		dispatchRepo,
@@ -66,14 +71,10 @@ func RegisterDependencies(injector *do.Injector) {
 		&http.Client{Timeout: 10 * time.Second},
 		"",
 		locations,
+		wsSvc,
 	)
 
 	do.Provide(injector, func(i *do.Injector) (dispatchController.DispatchController, error) {
 		return dispatchController.NewDispatchController(i, dispatchSvc), nil
-	})
-
-	wsSvc := dispatchwsService.NewDispatchWSService(locations)
-	do.Provide(injector, func(i *do.Injector) (dispatchwsController.DispatchWSController, error) {
-		return dispatchwsController.NewDispatchWSController(wsSvc), nil
 	})
 }

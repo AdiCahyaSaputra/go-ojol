@@ -26,7 +26,7 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 	{
 		dispatchCustomerRoutes.GET("/calculate-argo",
 			authenticate,
-			middlewares.ResolveProfileId(db), // customer_id lookup
+			middlewares.ResolveProfileId(db),
 			middlewares.Authorize(
 				enforcer,
 				constants.ENUM_ROLE_CUSTOMER,
@@ -36,19 +36,24 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 			dispatchController.CalculateArgo,
 		)
 
-		dispatchCustomerRoutes.POST("/find-driver", authenticate, middlewares.Authorize(
-			enforcer,
-			constants.ENUM_ROLE_CUSTOMER,
-			constants.ENUM_RESOURCE_DISPATCH,
-			constants.ENUM_ACTION_READ,
-		), dispatchController.FindDriver)
+		dispatchCustomerRoutes.POST("/find-driver",
+			authenticate,
+			middlewares.ResolveProfileId(db),
+			middlewares.Authorize(
+				enforcer,
+				constants.ENUM_ROLE_CUSTOMER,
+				constants.ENUM_RESOURCE_DISPATCH,
+				constants.ENUM_ACTION_CREATE,
+			),
+			dispatchController.FindDriver,
+		)
 	}
 
 	dispatchDriverRoutes := server.Group(constants.ROUTE_GROUP + "/dispatch/driver")
 	{
 		dispatchDriverRoutes.POST("/mode",
 			authenticate,
-			middlewares.ResolveProfileId(db), // customer_id lookup
+			middlewares.ResolveProfileId(db),
 			middlewares.Authorize(
 				enforcer,
 				constants.ENUM_ROLE_DRIVER,
@@ -56,6 +61,18 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 				constants.ENUM_ACTION_UPDATE,
 			),
 			dispatchController.SetDriverMode,
+		)
+
+		dispatchDriverRoutes.POST("/offers/:transaction_id/respond",
+			authenticate,
+			middlewares.ResolveProfileId(db),
+			middlewares.Authorize(
+				enforcer,
+				constants.ENUM_ROLE_DRIVER,
+				constants.ENUM_RESOURCE_DISPATCH,
+				constants.ENUM_ACTION_UPDATE,
+			),
+			dispatchController.RespondOffer,
 		)
 	}
 }

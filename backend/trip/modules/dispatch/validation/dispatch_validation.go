@@ -23,6 +23,10 @@ func NewDispatchValidation() *DispatchValidation {
 		dto.DriverModeOnline,
 		dto.DriverModeOffline,
 	))
+	validate.RegisterValidation("offer_action", validation.Enum(
+		dto.OfferActionAccept,
+		dto.OfferActionReject,
+	))
 
 	return &DispatchValidation{
 		validate: validate,

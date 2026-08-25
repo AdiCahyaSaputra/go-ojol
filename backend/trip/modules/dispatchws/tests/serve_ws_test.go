@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -85,8 +86,10 @@ func TestServeWS_StandbyThenFindDriver(t *testing.T) {
 
 	customer := sign(testCustomerUserID, "cst@example.com", "customer")
 	reqBody, err := json.Marshal(map[string]any{
-		"current_lat_long": []string{"-6.2088", "106.8456"},
-		"vehicle_type":     "motorcycle",
+		"pickup_lat_long":      []string{"-6.2088", "106.8456"},
+		"destination_lat_long": []string{"-6.1754", "106.8272"},
+		"vehicle_type":         "motorcycle",
+		"max_size":             1,
 	})
 	require.NoError(t, err)
 	req, err := http.NewRequest(
@@ -104,11 +107,21 @@ func TestServeWS_StandbyThenFindDriver(t *testing.T) {
 
 	var body struct {
 		Data struct {
-			Drivers []any `json:"drivers"`
+			TransactionID string `json:"transaction_id"`
+			Drivers       []any  `json:"drivers"`
 		} `json:"data"`
 	}
 	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 	require.NotEmpty(t, body.Data.Drivers)
+	require.NotEmpty(t, body.Data.TransactionID)
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var offerMsg wsdto.ServerMessage
+	require.NoError(t, conn.ReadJSON(&offerMsg))
+	assert.Equal(t, wsdto.TypeTripOffer, offerMsg.Type)
+	require.NotNil(t, offerMsg.Offer)
+	assert.Equal(t, body.Data.TransactionID, offerMsg.Offer.TransactionID)
+	assert.Equal(t, "Test Customer", offerMsg.Offer.CustomerName)
 }
 
 func TestServeWS_RejectsQueryToken(t *testing.T) {
@@ -225,7 +238,25 @@ func newDispatchWSServer(t *testing.T, allow bool) (*httptest.Server, func(userI
 	})
 
 	verifier := jwks.NewVerifier(jwksServer.URL, "go-ojol-auth")
-	wsCtrl := controller.NewDispatchWSController(service.NewDispatchWSService(store))
+	wsSvc := service.NewDispatchWSService(store)
+	wsCtrl := controller.NewDispatchWSController(wsSvc)
+
+	osrmServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"code": "Ok",
+			"routes": [{
+				"distance": 2000,
+				"duration": 180,
+				"geometry": {
+					"type": "LineString",
+					"coordinates": [[106.8456, -6.2088], [106.8272, -6.1754]]
+				}
+			}]
+		}`))
+	}))
+	t.Cleanup(osrmServer.Close)
+
 	repo := &wsStubDispatchRepo{nearbyProfiles: map[string]dispatchdto.NearbyDriverProfile{
 		testDriverUserID: {
 			UserID:        uuid.MustParse(testDriverUserID),
@@ -239,7 +270,14 @@ func newDispatchWSServer(t *testing.T, allow bool) (*httptest.Server, func(userI
 			Type:          "motorcycle",
 		},
 	}}
-	dispatchSvc := dispatchservice.NewDispatchService(repo, nil, nil, "", store)
+	dispatchSvc := dispatchservice.NewDispatchService(
+		repo,
+		nil,
+		osrmServer.Client(),
+		osrmServer.URL,
+		store,
+		wsSvc,
+	)
 	dispatchCtrl := dispatchcontroller.NewDispatchController(injector, dispatchSvc)
 
 	router := gin.New()
@@ -252,7 +290,14 @@ func newDispatchWSServer(t *testing.T, allow bool) (*httptest.Server, func(userI
 	router.POST(
 		"/api/trip/dispatch/customer/find-driver",
 		middlewares.Authenticate(verifier, session.AlwaysActive()),
-		middlewares.Authorize(&stubEnforcer{allow: true}, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_READ),
+		middlewares.Authorize(&stubEnforcer{allow: true}, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_CREATE),
+		func(ctx *gin.Context) {
+			ctx.Set("customer", entities.Customer{
+				ID:   uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+				Name: "Test Customer",
+			})
+			ctx.Next()
+		},
 		dispatchCtrl.FindDriver,
 	)
 
@@ -293,16 +338,69 @@ func (s *stubEnforcer) LoadPolicy() error {
 
 type wsStubDispatchRepo struct {
 	nearbyProfiles map[string]dispatchdto.NearbyDriverProfile
+	created        *entities.Transaction
+	statusByID     map[uuid.UUID]entities.TransactionStatus
 }
 
 func (s *wsStubDispatchRepo) VehicleById(id uuid.UUID) (*entities.Vehicle, error) {
 	return nil, nil
 }
 
-func (s *wsStubDispatchRepo) PendingArgoTransaction(req dispatchdto.PendingArgoTransaction) error {
-	return nil
+func (s *wsStubDispatchRepo) DistinctVehicleCategories() ([]dispatchdto.VehicleCategory, error) {
+	return []dispatchdto.VehicleCategory{
+		{VehicleType: entities.VehicleTypeMotorcycle, MaxSize: 1},
+	}, nil
 }
 
 func (s *wsStubDispatchRepo) NearbyDriverProfiles(_ []uuid.UUID, _ entities.VehicleType) (map[string]dispatchdto.NearbyDriverProfile, error) {
 	return s.nearbyProfiles, nil
+}
+
+func (s *wsStubDispatchRepo) CreateOfferedTransaction(req dispatchdto.CreateOfferedTransaction) (*entities.Transaction, error) {
+	txn := &entities.Transaction{
+		ID:                 uuid.New(),
+		CustomerID:         &req.CustomerID,
+		PickupLatLong:      req.PickupLatLong[:],
+		DestinationLatLong: req.DestinationLatLong[:],
+		LastLatLong:        req.LastLatLong[:],
+		Distance:           req.Distance,
+		FarePerDistance:    req.FarePerDistance,
+		PlatformPercentage: req.PlatformPercentage,
+		TotalFare:          req.TotalFare,
+		Status:             entities.TransactionStatusOffered,
+	}
+	s.created = txn
+	if s.statusByID == nil {
+		s.statusByID = map[uuid.UUID]entities.TransactionStatus{}
+	}
+	s.statusByID[txn.ID] = entities.TransactionStatusOffered
+	return txn, nil
+}
+
+func (s *wsStubDispatchRepo) ClaimOffer(txID, driverID, vehicleID uuid.UUID) (bool, error) {
+	return false, nil
+}
+
+func (s *wsStubDispatchRepo) ExpireOffer(txID uuid.UUID) (bool, error) {
+	if s.statusByID == nil {
+		return false, nil
+	}
+	status, ok := s.statusByID[txID]
+	if !ok || status != entities.TransactionStatusOffered {
+		return false, nil
+	}
+	s.statusByID[txID] = entities.TransactionStatusExpired
+	return true, nil
+}
+
+func (s *wsStubDispatchRepo) MarkRejectedOffer(txID uuid.UUID) (bool, error) {
+	return false, nil
+}
+
+func (s *wsStubDispatchRepo) TransactionByID(txID uuid.UUID) (*entities.Transaction, error) {
+	status, ok := s.statusByID[txID]
+	if !ok {
+		return nil, errors.New(dispatchdto.MESSAGE_OFFER_NOT_FOUND)
+	}
+	return &entities.Transaction{ID: txID, Status: status}, nil
 }

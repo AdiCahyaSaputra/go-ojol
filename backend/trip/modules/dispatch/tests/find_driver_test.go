@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/database/entities"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/service"
+	wsdto "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatchws/dto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,11 +42,17 @@ func testNearbyDriverProfile() dto.NearbyDriverProfile {
 func findDriverRequestBody(t *testing.T) *bytes.Reader {
 	t.Helper()
 	raw, err := json.Marshal(map[string]any{
-		"current_lat_long": []string{"-6.2088", "106.8456"},
-		"vehicle_type":     entities.VehicleTypeMotorcycle,
+		"pickup_lat_long":      []string{"-6.2088", "106.8456"},
+		"destination_lat_long": []string{"-6.1754", "106.8272"},
+		"vehicle_type":         entities.VehicleTypeMotorcycle,
+		"max_size":             1,
 	})
 	require.NoError(t, err)
 	return bytes.NewReader(raw)
+}
+
+func findDriverCtx() context.Context {
+	return context.WithValue(context.Background(), "customer", testCustomer())
 }
 
 func TestFindDriver_EmptyList(t *testing.T) {
@@ -80,14 +88,15 @@ func TestFindDriver_EmptyList(t *testing.T) {
 	assert.Empty(t, body.Data.Drivers)
 }
 
-func TestFindDriver_ReturnsNearby(t *testing.T) {
+func TestFindDriver_ReturnsNearbyAndCreatesOffer(t *testing.T) {
 	store := newGeoStore(t)
 	repo := &stubDispatchRepo{
 		nearbyProfiles: map[string]dto.NearbyDriverProfile{
 			testDriverUserID: testNearbyDriverProfile(),
 		},
 	}
-	router, sign, _ := newFindDriverRouterWithStoreAndAllow(t, true, store, repo)
+	notifier := &stubNotifier{}
+	router, sign, _, _ := newFindDriverRouterWithDeps(t, true, store, repo, notifier, nil)
 	require.NoError(t, store.SetStandby(context.Background(), testDriverUserID, -6.2088, 106.8456))
 
 	req := httptest.NewRequest(
@@ -105,7 +114,9 @@ func TestFindDriver_ReturnsNearby(t *testing.T) {
 	var body struct {
 		Status bool `json:"status"`
 		Data   struct {
-			Drivers []struct {
+			TransactionID string `json:"transaction_id"`
+			ExpiresInSec  int    `json:"expires_in_sec"`
+			Drivers       []struct {
 				DistanceM int        `json:"distance_m"`
 				Location  [2]float64 `json:"location"`
 				Profile   struct {
@@ -118,10 +129,20 @@ func TestFindDriver_ReturnsNearby(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	require.Len(t, body.Data.Drivers, 1)
+	assert.NotEmpty(t, body.Data.TransactionID)
+	assert.Equal(t, dto.OfferTTLSeconds, body.Data.ExpiresInSec)
 	assert.Equal(t, testDriverUserID, body.Data.Drivers[0].Profile.UserID)
 	assert.Equal(t, "Test Driver", body.Data.Drivers[0].Profile.Name)
 	assert.Equal(t, "Test Motorcycle", body.Data.Drivers[0].Profile.VehicleName)
 	assert.Equal(t, 0, body.Data.Drivers[0].DistanceM)
+
+	msgs := notifier.snapshot()
+	require.Len(t, msgs, 1)
+	assert.Equal(t, testDriverUserID, msgs[0].UserID)
+	assert.Equal(t, wsdto.TypeTripOffer, msgs[0].Msg.Type)
+	require.NotNil(t, msgs[0].Msg.Offer)
+	assert.Equal(t, "Test Customer", msgs[0].Msg.Offer.CustomerName)
+	assert.Equal(t, 2000, msgs[0].Msg.Offer.DistanceM)
 }
 
 func TestFindDriver_DeniesWhenUnauthorized(t *testing.T) {
@@ -142,47 +163,120 @@ func TestFindDriver_DeniesWhenUnauthorized(t *testing.T) {
 
 func TestFindDriverService_EmptyList(t *testing.T) {
 	store := newGeoStore(t)
-	svc := service.NewDispatchService(&stubDispatchRepo{}, nil, nil, "", store)
+	svc := service.NewDispatchService(&stubDispatchRepo{}, nil, nil, "", store, nil)
 
-	result, err := svc.FindDriver(context.Background(), dto.FindDriverRequest{
-		CurrentLatLong: [2]string{"-6.2088", "106.8456"},
-		VehicleType:    entities.VehicleTypeMotorcycle,
+	result, err := svc.FindDriver(findDriverCtx(), dto.FindDriverRequest{
+		PickupLatLong:      [2]string{"-6.2088", "106.8456"},
+		DestinationLatLong: [2]string{"-6.1754", "106.8272"},
+		VehicleType:        entities.VehicleTypeMotorcycle,
+		MaxSize:            1,
 	})
 	require.NoError(t, err)
 	assert.Empty(t, result.Drivers)
+	assert.Nil(t, result.TransactionID)
 }
 
 func TestFindDriverService_ReturnsNearby(t *testing.T) {
 	store := newGeoStore(t)
 	require.NoError(t, store.SetStandby(context.Background(), testDriverUserID, -6.2088, 106.8456))
 
+	osrm := httptest.NewServer(osrmOKHandler())
+	t.Cleanup(osrm.Close)
+
 	repo := &stubDispatchRepo{
 		nearbyProfiles: map[string]dto.NearbyDriverProfile{
 			testDriverUserID: testNearbyDriverProfile(),
 		},
 	}
-	svc := service.NewDispatchService(repo, nil, nil, "", store)
-	result, err := svc.FindDriver(context.Background(), dto.FindDriverRequest{
-		CurrentLatLong: [2]string{"-6.2088", "106.8456"},
-		VehicleType:    entities.VehicleTypeMotorcycle,
+	notifier := &stubNotifier{}
+	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, store, notifier)
+	result, err := svc.FindDriver(findDriverCtx(), dto.FindDriverRequest{
+		PickupLatLong:      [2]string{"-6.2088", "106.8456"},
+		DestinationLatLong: [2]string{"-6.1754", "106.8272"},
+		VehicleType:        entities.VehicleTypeMotorcycle,
+		MaxSize:            1,
 	})
 	require.NoError(t, err)
 	require.Len(t, result.Drivers, 1)
+	require.NotNil(t, result.TransactionID)
 	assert.Equal(t, testDriverUserID, result.Drivers[0].Profile.UserID.String())
 	assert.Equal(t, "Test Driver", result.Drivers[0].Profile.Name)
 	assert.Equal(t, 0, result.Drivers[0].DistanceM)
 	assert.InDelta(t, -6.2088, result.Drivers[0].Location[0], 0.0001)
 	assert.InDelta(t, 106.8456, result.Drivers[0].Location[1], 0.0001)
+	require.Len(t, notifier.snapshot(), 1)
 }
 
 func TestFindDriverService_InvalidLatLong(t *testing.T) {
 	store := newGeoStore(t)
-	svc := service.NewDispatchService(&stubDispatchRepo{}, nil, nil, "", store)
+	svc := service.NewDispatchService(&stubDispatchRepo{}, nil, nil, "", store, nil)
 
-	_, err := svc.FindDriver(context.Background(), dto.FindDriverRequest{
-		CurrentLatLong: [2]string{"not-a-lat", "106.8456"},
-		VehicleType:    entities.VehicleTypeMotorcycle,
+	_, err := svc.FindDriver(findDriverCtx(), dto.FindDriverRequest{
+		PickupLatLong:      [2]string{"not-a-lat", "106.8456"},
+		DestinationLatLong: [2]string{"-6.1754", "106.8272"},
+		VehicleType:        entities.VehicleTypeMotorcycle,
+		MaxSize:            1,
 	})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, service.ErrInvalidLatLong))
+}
+
+func TestFindDriverService_RequiresCustomer(t *testing.T) {
+	store := newGeoStore(t)
+	svc := service.NewDispatchService(&stubDispatchRepo{}, nil, nil, "", store, nil)
+
+	_, err := svc.FindDriver(context.Background(), dto.FindDriverRequest{
+		PickupLatLong:      [2]string{"-6.2088", "106.8456"},
+		DestinationLatLong: [2]string{"-6.1754", "106.8272"},
+		VehicleType:        entities.VehicleTypeMotorcycle,
+		MaxSize:            1,
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, service.ErrCustomerNotInCtx))
+}
+
+func TestFindDriverService_ExpiresOffer(t *testing.T) {
+	store := newGeoStore(t)
+	require.NoError(t, store.SetStandby(context.Background(), testDriverUserID, -6.2088, 106.8456))
+
+	osrm := httptest.NewServer(osrmOKHandler())
+	t.Cleanup(osrm.Close)
+
+	repo := &stubDispatchRepo{
+		nearbyProfiles: map[string]dto.NearbyDriverProfile{
+			testDriverUserID: testNearbyDriverProfile(),
+		},
+	}
+	notifier := &stubNotifier{}
+	svc := service.NewDispatchService(
+		repo,
+		nil,
+		osrm.Client(),
+		osrm.URL,
+		store,
+		notifier,
+		service.WithOfferTTL(20*time.Millisecond),
+	)
+
+	result, err := svc.FindDriver(findDriverCtx(), dto.FindDriverRequest{
+		PickupLatLong:      [2]string{"-6.2088", "106.8456"},
+		DestinationLatLong: [2]string{"-6.1754", "106.8272"},
+		VehicleType:        entities.VehicleTypeMotorcycle,
+		MaxSize:            1,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.TransactionID)
+
+	require.Eventually(t, func() bool {
+		for _, msg := range notifier.snapshot() {
+			if msg.Msg.Type == wsdto.TypeOfferExpired {
+				return true
+			}
+		}
+		return false
+	}, time.Second, 10*time.Millisecond)
+
+	txn, err := repo.TransactionByID(*result.TransactionID)
+	require.NoError(t, err)
+	assert.Equal(t, entities.TransactionStatusExpired, txn.Status)
 }

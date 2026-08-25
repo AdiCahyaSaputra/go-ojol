@@ -172,7 +172,7 @@ func TestCalculateArgo_MotorcycleFareAndPath(t *testing.T) {
 			{VehicleType: entities.VehicleTypeCar, MaxSize: 7},
 		},
 	}
-	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
+	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil, nil)
 
 	result, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
@@ -227,7 +227,7 @@ func TestCalculateArgo_SizeIncrementFare(t *testing.T) {
 			{VehicleType: entities.VehicleTypeCar, MaxSize: 4},
 		},
 	}
-	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
+	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil, nil)
 
 	result, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
@@ -254,7 +254,7 @@ func TestCalculateArgo_NoRoute(t *testing.T) {
 	t.Cleanup(osrm.Close)
 
 	repo := &stubDispatchRepo{}
-	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
+	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil, nil)
 
 	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
@@ -271,7 +271,7 @@ func TestCalculateArgo_OSRMUnavailable(t *testing.T) {
 	t.Cleanup(osrm.Close)
 
 	repo := &stubDispatchRepo{}
-	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
+	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil, nil)
 
 	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},
@@ -288,7 +288,7 @@ func TestCalculateArgo_InvalidJSONFromOSRM(t *testing.T) {
 	t.Cleanup(osrm.Close)
 
 	repo := &stubDispatchRepo{}
-	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil)
+	svc := service.NewDispatchService(repo, nil, osrm.Client(), osrm.URL, nil, nil)
 
 	_, err := svc.CalculateArgo(context.Background(), dto.CalculateArgoRequest{
 		PickupLoc:   [2]string{"-6.2088", "106.8456"},

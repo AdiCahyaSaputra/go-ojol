@@ -13,7 +13,11 @@ type DispatchRepository interface {
 	VehicleById(id uuid.UUID) (*entities.Vehicle, error)
 	DistinctVehicleCategories() ([]dto.VehicleCategory, error)
 	NearbyDriverProfiles(driverUserIds []uuid.UUID, vehicleType entities.VehicleType) (map[string]dto.NearbyDriverProfile, error)
-	PendingArgoTransaction(req dto.PendingArgoTransaction) error
+	CreateOfferedTransaction(req dto.CreateOfferedTransaction) (*entities.Transaction, error)
+	ClaimOffer(txID, driverID, vehicleID uuid.UUID) (bool, error)
+	ExpireOffer(txID uuid.UUID) (bool, error)
+	MarkRejectedOffer(txID uuid.UUID) (bool, error)
+	TransactionByID(txID uuid.UUID) (*entities.Transaction, error)
 }
 
 type dispatchRepository struct {
@@ -91,25 +95,67 @@ func (r *dispatchRepository) NearbyDriverProfiles(driverUserIds []uuid.UUID, veh
 	return driversProfileMap, nil
 }
 
-func (r *dispatchRepository) PendingArgoTransaction(req dto.PendingArgoTransaction) error {
+func (r *dispatchRepository) CreateOfferedTransaction(req dto.CreateOfferedTransaction) (*entities.Transaction, error) {
 	data := entities.Transaction{
 		CustomerID:         &req.CustomerID,
-		VehicleID:          &req.VehicleID,
 		PickupLatLong:      req.PickupLatLong[:],
-		LastLatLong:        req.PickupLatLong[:],
+		LastLatLong:        req.LastLatLong[:],
 		DestinationLatLong: req.DestinationLatLong[:],
 		Distance:           req.Distance,
 		FarePerDistance:    req.FarePerDistance,
 		PlatformPercentage: req.PlatformPercentage,
 		TotalFare:          req.TotalFare,
-		Status:             entities.TransactionStatusPending,
+		Status:             entities.TransactionStatusOffered,
 	}
 
-	result := r.db.Create(&data)
+	if err := r.db.Create(&data).Error; err != nil {
+		return nil, err
+	}
 
+	return &data, nil
+}
+
+func (r *dispatchRepository) ClaimOffer(txID, driverID, vehicleID uuid.UUID) (bool, error) {
+	result := r.db.Model(&entities.Transaction{}).
+		Where("id = ? AND status = ?", txID, entities.TransactionStatusOffered).
+		Updates(map[string]any{
+			"status":     entities.TransactionStatusAcceptedOffer,
+			"driver_id":  driverID,
+			"vehicle_id": vehicleID,
+		})
 	if result.Error != nil {
-		return result.Error
+		return false, result.Error
 	}
+	return result.RowsAffected > 0, nil
+}
 
-	return nil
+func (r *dispatchRepository) ExpireOffer(txID uuid.UUID) (bool, error) {
+	result := r.db.Model(&entities.Transaction{}).
+		Where("id = ? AND status = ?", txID, entities.TransactionStatusOffered).
+		Update("status", entities.TransactionStatusExpired)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
+func (r *dispatchRepository) MarkRejectedOffer(txID uuid.UUID) (bool, error) {
+	result := r.db.Model(&entities.Transaction{}).
+		Where("id = ? AND status = ?", txID, entities.TransactionStatusOffered).
+		Update("status", entities.TransactionStatusRejectedOffer)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
+func (r *dispatchRepository) TransactionByID(txID uuid.UUID) (*entities.Transaction, error) {
+	var txn entities.Transaction
+	if err := r.db.First(&txn, "id = ?", txID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New(dto.MESSAGE_OFFER_NOT_FOUND)
+		}
+		return nil, err
+	}
+	return &txn, nil
 }

@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.goojoldrv"
+      "bundleIdentifier": "com.anonymous.goojoldrv",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Goojol needs your location so nearby customers can find you while you are online."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +22,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.goojoldrv"
+      "package": "com.anonymous.goojoldrv",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -28,6 +35,13 @@
     },
     "plugins": [
       "expo-router",
+      "@maplibre/maplibre-react-native",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Goojol needs your location so nearby customers can find you while you are online."
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -35,7 +49,9 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

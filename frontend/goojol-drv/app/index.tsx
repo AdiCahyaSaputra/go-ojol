@@ -18,7 +18,7 @@ const EntryPoint = () => {
       }
 
       if (session?.refreshToken) {
-        router.replace('/(auth)/home');
+        router.replace('/(auth)/(tabs)/home');
       } else if (currentPath !== '/login') {
         router.replace('/(public)/login');
       }

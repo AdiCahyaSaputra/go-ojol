@@ -39,7 +39,7 @@ export const useLoginMutation = () => {
         refreshToken: data.refresh_token,
         role: data.role,
       });
-      router.replace('/(auth)/home');
+      router.replace('/(auth)/(tabs)/home');
     },
   });
 };

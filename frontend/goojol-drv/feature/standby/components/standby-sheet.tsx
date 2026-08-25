@@ -38,7 +38,7 @@ export function StandbySheet() {
           </View>
         ) : null}
 
-        {phase === 'offline' ? (
+        {phase === 'offline' && (
           <>
             <VStack space="xs">
               <Text className="font-semibold text-lg text-white">You're offline</Text>
@@ -61,9 +61,9 @@ export function StandbySheet() {
               <ButtonText className="font-semibold text-white">Go online</ButtonText>
             </Button>
           </>
-        ) : null}
+        )}
 
-        {phase === 'online' ? (
+        {phase === 'online' && (
           <>
             <HStack className="items-center justify-between">
               <VStack space="xs" className="flex-1">
@@ -77,7 +77,7 @@ export function StandbySheet() {
             <HStack className="gap-3">
               <Button
                 variant="outline"
-                className="flex-1 border-goojol-border data-[active=true]:bg-goojol-surface"
+                className="flex-1 border-goojol-border bg-goojol-surface"
                 onPress={goOffline}
                 isDisabled={isBusy}
                 accessibilityLabel="Go offline"
@@ -95,9 +95,9 @@ export function StandbySheet() {
               </Button>
             </HStack>
           </>
-        ) : null}
+        )}
 
-        {phase === 'offer' && offer ? (
+        {phase === 'offer' && offer && (
           <>
             <HStack className="items-start justify-between gap-3">
               <VStack space="xs" className="min-w-0 flex-1">
@@ -136,11 +136,11 @@ export function StandbySheet() {
             <HStack className="gap-3">
               <Button
                 variant="outline"
-                className="flex-1 border-goojol-border data-[active=true]:bg-goojol-surface"
+                className="flex-1 border-goojol-border bg-goojol-surface"
                 onPress={rejectOffer}
                 accessibilityLabel="Reject offer"
               >
-                <ButtonText className="font-semibold text-white">Reject</ButtonText>
+                <ButtonText className="font-semibold text-red-600">Reject</ButtonText>
               </Button>
               <Button
                 className="flex-1 bg-goojol-coral data-[active=true]:bg-goojol-coral/90"
@@ -151,9 +151,9 @@ export function StandbySheet() {
               </Button>
             </HStack>
           </>
-        ) : null}
+        )}
 
-        {phase === 'accepted' && offer ? (
+        {phase === 'accepted' && offer && (
           <>
             <VStack space="xs">
               <Text className="font-semibold text-lg text-white">Head to pickup</Text>
@@ -183,7 +183,7 @@ export function StandbySheet() {
               <ButtonText className="font-semibold text-white">Complete</ButtonText>
             </Button>
           </>
-        ) : null}
+        )}
       </VStack>
     </View>
   );

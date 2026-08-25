@@ -9,17 +9,6 @@ type StandbyWsHandlers = {
   onClose?: () => void;
 };
 
-function toWsBaseUrl(httpBase: string): string {
-  const trimmed = httpBase.replace(/\/$/, '');
-  if (trimmed.startsWith('https://')) {
-    return `wss://${trimmed.slice('https://'.length)}`;
-  }
-  if (trimmed.startsWith('http://')) {
-    return `ws://${trimmed.slice('http://'.length)}`;
-  }
-  return trimmed;
-}
-
 export class StandbySocket {
   private socket: WebSocket | null = null;
   private closedByClient = false;
@@ -28,11 +17,12 @@ export class StandbySocket {
     this.disconnect();
     this.closedByClient = false;
 
-    const apiBase = process.env.EXPO_PUBLIC_API_URL ?? '';
-    const wsBase = toWsBaseUrl(apiBase);
-    const url = `${wsBase}/api/trip/dispatch/ws?token=${encodeURIComponent(accessToken)}`;
+    const wsUrl = process.env.EXPO_PUBLIC_WS_URL ?? '';
+    const url = `${wsUrl}/api/trip/dispatch/ws`;
 
-    const socket = new WebSocket(url);
+		// NOTES: workaround as we can't send Authorization header in websocket connection
+		// https://github.com/kubernetes/kubernetes/commit/714f97d7baf4975ad3aa47735a868a81a984d1f0#diff-43f0e0ab1c89ddde1a59685bcdbe8403d5db98da2c5b7de7ad5191e2e8665e3aR15-R34
+    const socket = new WebSocket(url, [accessToken]); // Sec-WebSocket-Protocol
     this.socket = socket;
 
     socket.onmessage = (event) => {

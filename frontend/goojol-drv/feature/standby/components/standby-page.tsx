@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
@@ -6,7 +6,7 @@ import { DEFAULT_LOCATION } from '@/constants/standby';
 import { StandbyMap } from '@/feature/standby/components/standby-map';
 import { StandbySheet } from '@/feature/standby/components/standby-sheet';
 import { resolveDriverLocation } from '@/feature/standby/location';
-import { useStandby } from '@/feature/standby/standby-context';
+import { StandbyPhase, useStandby } from '@/feature/standby/standby-context';
 
 export default function StandbyPage() {
   const { phase, coords, offer } = useStandby();
@@ -14,6 +14,15 @@ export default function StandbyPage() {
     lat: DEFAULT_LOCATION.lat,
     lng: DEFAULT_LOCATION.lng,
   });
+
+  const phaseStatus = useMemo(() => {
+    return {
+      online: 'Online',
+      offline: 'Offline',
+      offer: 'Incoming Offer',
+      accepted: 'En Route', // On The Way
+    } as Record<StandbyPhase, string>;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,22 +51,6 @@ export default function StandbyPage() {
         showRoute={showRoute}
         padding={{ top: 48, right: 28, bottom: bottomPad, left: 28 }}
       />
-
-      <SafeAreaView edges={['top']} className="absolute inset-x-0 top-0">
-        <View className="px-4 pt-2">
-          <View className="self-start rounded-full border border-goojol-border bg-goojol-sky/90 px-3 py-1.5">
-            <Text className="font-semibold text-sm text-white">
-              {phase === 'offline'
-                ? 'Offline'
-                : phase === 'online'
-                  ? 'Standby'
-                  : phase === 'offer'
-                    ? 'Incoming offer'
-                    : 'En route'}
-            </Text>
-          </View>
-        </View>
-      </SafeAreaView>
 
       <View className="absolute inset-x-0 bottom-0" pointerEvents="box-none">
         <StandbySheet />

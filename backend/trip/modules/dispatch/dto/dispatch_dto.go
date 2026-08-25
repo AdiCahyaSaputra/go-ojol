@@ -44,9 +44,9 @@ type (
 	}
 
 	VehicleOption struct {
-		VehicleType     entities.VehicleType `json:"vehicle_type"`
-		MaxSize         int                  `json:"max_size"`
-		TotalFare       int                  `json:"total_fare"`
+		VehicleType entities.VehicleType `json:"vehicle_type"`
+		MaxSize     int                  `json:"max_size"`
+		TotalFare   int                  `json:"total_fare"`
 	}
 
 	CalculateArgoResponse struct {

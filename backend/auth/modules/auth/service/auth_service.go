@@ -117,15 +117,16 @@ func (s *authService) Register(ctx context.Context, req userDto.UserCreateReques
 		profilePictureURL = &url
 	}
 
-	hashedPassword, err := helpers.HashPassword(req.Password)
-	if err != nil {
-		return userDto.UserResponse{}, err
-	}
+	// NOTE: We already hash the password in BeforeCreate hook
+	// hashedPassword, err := helpers.HashPassword(req.Password)
+	// if err != nil {
+	// 	return userDto.UserResponse{}, err
+	// }
 
 	user := entities.User{
 		ID:       uuid.New(),
 		Email:    req.Email,
-		Password: hashedPassword,
+		Password: req.Password,
 	}
 
 	var (

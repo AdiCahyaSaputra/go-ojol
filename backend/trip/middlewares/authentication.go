@@ -42,7 +42,7 @@ func authenticate(verifier jwks.Verifier, sessions session.Checker) gin.HandlerF
 		}
 
 		if claims.UserID == "" {
-			response := utils.BuildResponseFailed(dto.MESSAGE_FAILED_PROSES_REQUEST, dto.MESSAGE_FAILED_DENIED_ACCESS, nil)
+			response := utils.BuildResponseFailed(dto.MESSAGE_USER_ID_CLAIM_MISSING, dto.MESSAGE_FAILED_DENIED_ACCESS, nil)
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, response)
 			return
 		}
@@ -72,12 +72,15 @@ func authenticate(verifier jwks.Verifier, sessions session.Checker) gin.HandlerF
 
 func bearerToken(ctx *gin.Context) (raw string, ok bool) {
 	authHeader := ctx.GetHeader("Authorization")
-	if authHeader == "" {
-		return "", false
+	authWSSubProtocol := ctx.GetHeader("Sec-WebSocket-Protocol")
+
+	if authHeader != "" {
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			return authHeader, false
+		}
+		raw := strings.TrimPrefix(authHeader, "Bearer ")
+		return raw, raw != ""
+	} else {
+		return authWSSubProtocol, authWSSubProtocol != ""
 	}
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return authHeader, false
-	}
-	raw = strings.TrimPrefix(authHeader, "Bearer ")
-	return raw, raw != ""
 }

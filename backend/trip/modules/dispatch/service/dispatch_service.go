@@ -45,17 +45,23 @@ var (
 	ErrOfferUnavailable   = errors.New(dto.MESSAGE_OFFER_UNAVAILABLE)
 	ErrInvalidOfferAction = errors.New(dto.MESSAGE_INVALID_OFFER_ACTION)
 	ErrNotOfferedDriver   = errors.New(dto.MESSAGE_NOT_OFFERED_DRIVER)
+	ErrNoLastSearch       = errors.New(dto.MESSAGE_NO_LAST_SEARCH)
+	ErrOfferStillActive   = errors.New(dto.MESSAGE_OFFER_STILL_ACTIVE)
 )
 
-type DriverNotifier interface {
+type OfferNotifier interface {
 	Notify(userID string, msg wsdto.ServerMessage) bool
 	NotifyMany(userIDs []string, msg wsdto.ServerMessage)
 }
+
+// DriverNotifier is kept as an alias for existing call sites/tests.
+type DriverNotifier = OfferNotifier
 
 type DispatchService interface {
 	// Customer
 	CalculateArgo(ctx context.Context, req dto.CalculateArgoRequest) (dto.CalculateArgoResponse, error)
 	FindDriver(ctx context.Context, req dto.FindDriverRequest) (dto.FindDriverResponse, error)
+	RetryFindDriver(ctx context.Context, customerUserID string) error
 
 	// Driver
 	SetDriverMode(ctx context.Context, req dto.SetDriverModeRequest) error
@@ -63,8 +69,14 @@ type DispatchService interface {
 }
 
 type pendingOffer struct {
-	driverUserIDs []string
-	pending       map[string]struct{}
+	customerUserID string
+	driverUserIDs  []string
+	pending        map[string]struct{}
+}
+
+type lastSearch struct {
+	req      dto.FindDriverRequest
+	customer entities.Customer
 }
 
 type dispatchService struct {
@@ -73,11 +85,14 @@ type dispatchService struct {
 	httpClient         *http.Client
 	osrmBaseURL        string
 	locations          *drivergeo.Store
-	notifier           DriverNotifier
+	notifier           OfferNotifier
 	offerTTL           time.Duration
 
 	offersMu sync.Mutex
 	offers   map[uuid.UUID]*pendingOffer
+
+	searchesMu  sync.Mutex
+	lastSearch  map[string]lastSearch
 }
 
 type Option interface {
@@ -102,7 +117,7 @@ func NewDispatchService(
 	httpClient *http.Client,
 	osrmBaseURL string,
 	locations *drivergeo.Store,
-	notifier DriverNotifier,
+	notifier OfferNotifier,
 	opts ...Option,
 ) DispatchService {
 	if httpClient == nil {
@@ -121,6 +136,7 @@ func NewDispatchService(
 		notifier:           notifier,
 		offerTTL:           time.Duration(dto.OfferTTLSeconds) * time.Second,
 		offers:             make(map[uuid.UUID]*pendingOffer),
+		lastSearch:         make(map[string]lastSearch),
 	}
 	for _, opt := range opts {
 		opt.apply(s)
@@ -175,12 +191,41 @@ func (s *dispatchService) CalculateArgo(ctx context.Context, req dto.CalculateAr
 }
 
 func (s *dispatchService) FindDriver(ctx context.Context, req dto.FindDriverRequest) (dto.FindDriverResponse, error) {
+	customer, ok := ctx.Value("customer").(entities.Customer)
+	if !ok || customer.ID == uuid.Nil {
+		return dto.FindDriverResponse{}, ErrCustomerNotInCtx
+	}
+
+	return s.startOffer(ctx, customer, req)
+}
+
+func (s *dispatchService) RetryFindDriver(ctx context.Context, customerUserID string) error {
+	if customerUserID == "" {
+		return ErrNoLastSearch
+	}
+
+	s.searchesMu.Lock()
+	search, ok := s.lastSearch[customerUserID]
+	s.searchesMu.Unlock()
+	if !ok {
+		return ErrNoLastSearch
+	}
+
+	if s.hasActiveOfferForCustomer(customerUserID) {
+		return ErrOfferStillActive
+	}
+
+	_, err := s.startOffer(ctx, search.customer, search.req)
+	return err
+}
+
+func (s *dispatchService) startOffer(ctx context.Context, customer entities.Customer, req dto.FindDriverRequest) (dto.FindDriverResponse, error) {
 	if s.locations == nil {
 		return dto.FindDriverResponse{}, ErrLocationStore
 	}
 
-	customer, ok := ctx.Value("customer").(entities.Customer)
-	if !ok || customer.ID == uuid.Nil {
+	customerUserID := customer.UserID.String()
+	if customer.UserID == uuid.Nil {
 		return dto.FindDriverResponse{}, ErrCustomerNotInCtx
 	}
 
@@ -223,7 +268,12 @@ func (s *dispatchService) FindDriver(ctx context.Context, req dto.FindDriverRequ
 		}
 	}
 
+	s.storeLastSearch(customerUserID, customer, req)
+
 	if len(drivers) == 0 {
+		if s.notifier != nil {
+			s.notifier.Notify(customerUserID, wsdto.ServerMessage{Type: wsdto.TypeNoDrivers})
+		}
 		return dto.FindDriverResponse{Drivers: drivers}, nil
 	}
 
@@ -264,8 +314,9 @@ func (s *dispatchService) FindDriver(ctx context.Context, req dto.FindDriverRequ
 
 	s.offersMu.Lock()
 	s.offers[transactionNew.ID] = &pendingOffer{
-		driverUserIDs: offeredUserIDs,
-		pending:       pending,
+		customerUserID: customerUserID,
+		driverUserIDs:  offeredUserIDs,
+		pending:        pending,
 	}
 	s.offersMu.Unlock()
 
@@ -284,6 +335,11 @@ func (s *dispatchService) FindDriver(ctx context.Context, req dto.FindDriverRequ
 	}
 	if s.notifier != nil {
 		s.notifier.NotifyMany(offeredUserIDs, offerMsg)
+		s.notifier.Notify(customerUserID, wsdto.ServerMessage{
+			Type:          wsdto.TypeWaiting,
+			TransactionID: transactionNew.ID.String(),
+			ExpiresInSec:  dto.OfferTTLSeconds,
+		})
 	}
 
 	s.scheduleOfferExpiry(transactionNew.ID)
@@ -295,6 +351,23 @@ func (s *dispatchService) FindDriver(ctx context.Context, req dto.FindDriverRequ
 	}, nil
 }
 
+func (s *dispatchService) storeLastSearch(customerUserID string, customer entities.Customer, req dto.FindDriverRequest) {
+	s.searchesMu.Lock()
+	defer s.searchesMu.Unlock()
+	s.lastSearch[customerUserID] = lastSearch{req: req, customer: customer}
+}
+
+func (s *dispatchService) hasActiveOfferForCustomer(customerUserID string) bool {
+	s.offersMu.Lock()
+	defer s.offersMu.Unlock()
+	for _, offer := range s.offers {
+		if offer.customerUserID == customerUserID {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *dispatchService) scheduleOfferExpiry(txID uuid.UUID) {
 	ttl := s.offerTTL
 	time.AfterFunc(ttl, func() {
@@ -304,9 +377,18 @@ func (s *dispatchService) scheduleOfferExpiry(txID uuid.UUID) {
 			return
 		}
 
-		userIDs := s.clearPendingOffer(txID)
-		if s.notifier != nil && len(userIDs) > 0 {
-			s.notifier.NotifyMany(userIDs, wsdto.ServerMessage{
+		offer := s.clearPendingOffer(txID)
+		if offer == nil || s.notifier == nil {
+			return
+		}
+		if len(offer.driverUserIDs) > 0 {
+			s.notifier.NotifyMany(offer.driverUserIDs, wsdto.ServerMessage{
+				Type:          wsdto.TypeOfferExpired,
+				TransactionID: txID.String(),
+			})
+		}
+		if offer.customerUserID != "" {
+			s.notifier.Notify(offer.customerUserID, wsdto.ServerMessage{
 				Type:          wsdto.TypeOfferExpired,
 				TransactionID: txID.String(),
 			})
@@ -314,16 +396,15 @@ func (s *dispatchService) scheduleOfferExpiry(txID uuid.UUID) {
 	})
 }
 
-func (s *dispatchService) clearPendingOffer(txID uuid.UUID) []string {
+func (s *dispatchService) clearPendingOffer(txID uuid.UUID) *pendingOffer {
 	s.offersMu.Lock()
 	defer s.offersMu.Unlock()
 	offer, ok := s.offers[txID]
 	if !ok {
 		return nil
 	}
-	userIDs := append([]string(nil), offer.driverUserIDs...)
 	delete(s.offers, txID)
-	return userIDs
+	return offer
 }
 
 func (s *dispatchService) RespondOffer(ctx context.Context, transactionID uuid.UUID, req dto.RespondOfferRequest) (dto.RespondOfferResponse, error) {
@@ -366,18 +447,40 @@ func (s *dispatchService) acceptOffer(ctx context.Context, transactionID uuid.UU
 		_ = s.locations.RemoveStandby(ctx, driver.UserID.String())
 	}
 
-	userIDs := s.clearPendingOffer(transactionID)
-	others := make([]string, 0, len(userIDs))
-	winner := driver.UserID.String()
-	for _, id := range userIDs {
-		if id != winner {
-			others = append(others, id)
+	offer := s.clearPendingOffer(transactionID)
+	others := make([]string, 0)
+	if offer != nil {
+		winner := driver.UserID.String()
+		for _, id := range offer.driverUserIDs {
+			if id != winner {
+				others = append(others, id)
+			}
 		}
 	}
 	if s.notifier != nil && len(others) > 0 {
 		s.notifier.NotifyMany(others, wsdto.ServerMessage{
 			Type:          wsdto.TypeOfferTaken,
 			TransactionID: transactionID.String(),
+		})
+	}
+
+	if s.notifier != nil && offer != nil && offer.customerUserID != "" {
+		matched := &wsdto.MatchedDriverPayload{
+			UserID:      driver.UserID.String(),
+			DriverID:    driver.ID.String(),
+			Name:        driver.Name,
+			PhoneNumber: driver.PhoneNumber,
+			VehicleID:   driver.VehicleID.String(),
+		}
+		if vehicle, err := s.dispatchRepository.VehicleById(driver.VehicleID); err == nil && vehicle != nil {
+			matched.VehicleName = vehicle.Name
+			matched.LicenseNumber = vehicle.LicenseNumber
+			matched.VehicleType = string(vehicle.Type)
+		}
+		s.notifier.Notify(offer.customerUserID, wsdto.ServerMessage{
+			Type:          wsdto.TypeDriverMatched,
+			TransactionID: transactionID.String(),
+			MatchedDriver: matched,
 		})
 	}
 
@@ -409,6 +512,7 @@ func (s *dispatchService) rejectOffer(transactionID uuid.UUID, driver entities.D
 	}
 	delete(offer.pending, userID)
 	allRejected := len(offer.pending) == 0
+	customerUserID := offer.customerUserID
 	s.offersMu.Unlock()
 
 	status := entities.TransactionStatusOffered
@@ -421,6 +525,12 @@ func (s *dispatchService) rejectOffer(transactionID uuid.UUID, driver entities.D
 			status = entities.TransactionStatusRejectedOffer
 		}
 		s.clearPendingOffer(transactionID)
+		if s.notifier != nil && customerUserID != "" {
+			s.notifier.Notify(customerUserID, wsdto.ServerMessage{
+				Type:          wsdto.TypeOfferRejected,
+				TransactionID: transactionID.String(),
+			})
+		}
 	}
 
 	return dto.RespondOfferResponse{

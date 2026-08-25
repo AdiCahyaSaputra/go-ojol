@@ -73,6 +73,7 @@ func RegisterDependencies(injector *do.Injector) {
 		locations,
 		wsSvc,
 	)
+	wsSvc.SetOfferRetrier(dispatchSvc)
 
 	do.Provide(injector, func(i *do.Injector) (dispatchController.DispatchController, error) {
 		return dispatchController.NewDispatchController(i, dispatchSvc), nil

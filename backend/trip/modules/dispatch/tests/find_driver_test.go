@@ -137,12 +137,14 @@ func TestFindDriver_ReturnsNearbyAndCreatesOffer(t *testing.T) {
 	assert.Equal(t, 0, body.Data.Drivers[0].DistanceM)
 
 	msgs := notifier.snapshot()
-	require.Len(t, msgs, 1)
+	require.Len(t, msgs, 2)
 	assert.Equal(t, testDriverUserID, msgs[0].UserID)
 	assert.Equal(t, wsdto.TypeTripOffer, msgs[0].Msg.Type)
 	require.NotNil(t, msgs[0].Msg.Offer)
 	assert.Equal(t, "Test Customer", msgs[0].Msg.Offer.CustomerName)
 	assert.Equal(t, 2000, msgs[0].Msg.Offer.DistanceM)
+	assert.Equal(t, testCustomer().UserID.String(), msgs[1].UserID)
+	assert.Equal(t, wsdto.TypeWaiting, msgs[1].Msg.Type)
 }
 
 func TestFindDriver_DeniesWhenUnauthorized(t *testing.T) {
@@ -204,7 +206,7 @@ func TestFindDriverService_ReturnsNearby(t *testing.T) {
 	assert.Equal(t, 0, result.Drivers[0].DistanceM)
 	assert.InDelta(t, -6.2088, result.Drivers[0].Location[0], 0.0001)
 	assert.InDelta(t, 106.8456, result.Drivers[0].Location[1], 0.0001)
-	require.Len(t, notifier.snapshot(), 1)
+	require.Len(t, notifier.snapshot(), 2)
 }
 
 func TestFindDriverService_InvalidLatLong(t *testing.T) {

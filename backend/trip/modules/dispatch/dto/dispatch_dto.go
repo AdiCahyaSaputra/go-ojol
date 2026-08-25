@@ -31,6 +31,8 @@ const (
 	MESSAGE_OFFER_UNAVAILABLE     = "offer no longer available"
 	MESSAGE_INVALID_OFFER_ACTION  = "action must be accept or reject"
 	MESSAGE_NOT_OFFERED_DRIVER    = "driver was not offered this trip"
+	MESSAGE_NO_LAST_SEARCH        = "no previous search to retry"
+	MESSAGE_OFFER_STILL_ACTIVE    = "offer still active, cannot retry"
 )
 
 type DriverMode string

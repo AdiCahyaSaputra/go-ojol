@@ -13,6 +13,7 @@ import (
 type (
 	DispatchWSController interface {
 		ServeWS(ctx *gin.Context)
+		ServeCustomerWS(ctx *gin.Context)
 	}
 
 	dispatchWSController struct {
@@ -33,6 +34,14 @@ func NewDispatchWSController(s service.DispatchWSService) DispatchWSController {
 }
 
 func (c *dispatchWSController) ServeWS(ctx *gin.Context) {
+	c.serve(ctx, c.dispatchWSService.HandleConn)
+}
+
+func (c *dispatchWSController) ServeCustomerWS(ctx *gin.Context) {
+	c.serve(ctx, c.dispatchWSService.HandleCustomerConn)
+}
+
+func (c *dispatchWSController) serve(ctx *gin.Context, handle func(userID string, conn *websocket.Conn)) {
 	userID, _ := ctx.Get("user_id")
 	id, _ := userID.(string)
 	if id == "" {
@@ -45,7 +54,7 @@ func (c *dispatchWSController) ServeWS(ctx *gin.Context) {
 		return
 	}
 
-	c.dispatchWSService.HandleConn(id, conn)
+	handle(id, conn)
 }
 
 func checkOrigin(r *http.Request) bool {

@@ -18,10 +18,12 @@ func RegisterRoutes(server *gin.Engine, injector *do.Injector) {
 	enforcer := do.MustInvokeNamed[pkgcasbin.Enforcer](injector, constants.CasbinEnforcer)
 
 	authenticate := middlewares.AuthenticateWS(verifier, sessions)
-	authorizeUpdate := middlewares.Authorize(enforcer, constants.ENUM_ROLE_DRIVER, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_UPDATE)
+	authorizeDriverUpdate := middlewares.Authorize(enforcer, constants.ENUM_ROLE_DRIVER, constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_UPDATE)
+	authorizeCustomerCreate := middlewares.Authorize(enforcer, constants.ENUM_ROLE_CUSTOMER, constants.ENUM_RESOURCE_DISPATCH, constants.ENUM_ACTION_CREATE)
 
 	dispatchRoutes := server.Group(constants.ROUTE_GROUP + "/dispatch")
 	{
-		dispatchRoutes.GET("/ws", authenticate, authorizeUpdate, dispatchWSController.ServeWS)
+		dispatchRoutes.GET("/ws", authenticate, authorizeDriverUpdate, dispatchWSController.ServeWS)
+		dispatchRoutes.GET("/customer/ws", authenticate, authorizeCustomerCreate, dispatchWSController.ServeCustomerWS)
 	}
 }

@@ -66,7 +66,7 @@
       }
     },
     {
-      "includes": ["app/+html.tsx"],
+      "includes": ["app/+html.tsx", "components/ui/gluestack-ui-provider/index.web.tsx"],
       "linter": {
         "rules": {
           "security": {

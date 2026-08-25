@@ -9,10 +9,14 @@ import (
 type TransactionStatus string
 
 const (
-	TransactionStatusPending   TransactionStatus = "pending"
-	TransactionStatusOnTheWay  TransactionStatus = "on_the_way"
-	TransactionStatusCompleted TransactionStatus = "completed"
-	TransactionStatusCancelled TransactionStatus = "cancelled"
+	TransactionStatusPending       TransactionStatus = "pending"
+	TransactionStatusOffered       TransactionStatus = "offered"
+	TransactionStatusAcceptedOffer TransactionStatus = "accepted_offer"
+	TransactionStatusRejectedOffer TransactionStatus = "rejected_offer"
+	TransactionStatusOnTheWay      TransactionStatus = "on_the_way"
+	TransactionStatusCompleted     TransactionStatus = "completed"
+	TransactionStatusExpired       TransactionStatus = "expired"
+	TransactionStatusCancelled     TransactionStatus = "cancelled"
 )
 
 type Transaction struct {

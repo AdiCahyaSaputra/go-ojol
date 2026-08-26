@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/constants/query-keys';
-import type { SavedAddress } from './saved-address.schema';
-import { listSavedAddresses, upsertSavedAddress } from './saved-address.storage';
+import type { CreateSavedAddressRequest } from './saved-address.schema';
+import { createSavedAddress, listSavedAddresses } from './saved-address.service';
 
 export function useSavedAddressesQuery() {
   return useQuery({
@@ -10,13 +10,13 @@ export function useSavedAddressesQuery() {
   });
 }
 
-export function useUpsertSavedAddressMutation() {
+export function useCreateSavedAddressMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: Omit<SavedAddress, 'id'> & { id?: string }) => upsertSavedAddress(input),
-    onSuccess: (data) => {
-      queryClient.setQueryData(QUERY_KEYS.savedAddresses, data);
+    mutationFn: (input: CreateSavedAddressRequest) => createSavedAddress(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.savedAddresses });
     },
   });
 }

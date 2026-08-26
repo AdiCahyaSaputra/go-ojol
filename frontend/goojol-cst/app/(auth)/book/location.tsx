@@ -1,25 +1,22 @@
 import { useRouter } from 'expo-router';
-import { ArrowUpLeft, Clock3, LucideMapPinHouse, LucideMapPinned } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { LucideMapPinHouse, LucideMapPinned } from 'lucide-react-native';
+import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { Button, ButtonText } from '@/components/ui/button';
-import { FormControl, FormControlLabel, FormControlLabelText } from '@/components/ui/form-control';
 import { HStack } from '@/components/ui/hstack';
 import { Input, InputField } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
-import { DEFAULT_PICKUP, DESTINATION_PRESETS } from '@/constants/book';
+import { DESTINATION_PRESETS } from '@/constants/book';
 import { useBook } from '@/feature/book/book-context';
 import { LocationMap } from '@/feature/book/components/location-map';
 import { WizardShell } from '@/feature/book/components/wizard-shell';
+import { resolveCurrentLocation } from '@/feature/book/current-location';
 import type { BookLocation } from '@/feature/book/dispatch.schema';
-import { SavedAddressChips } from '@/feature/saved-address/components/saved-address-chips';
+import { AddSavedAddressModal } from '@/feature/saved-address/components/add-saved-address-modal';
+import { AddressSuggestions } from '@/feature/saved-address/components/address-suggestions';
 
 type ActiveField = 'pickup' | 'destination';
-
-function isSameLocation(a: BookLocation, b: BookLocation) {
-  return a.name === b.name && a.lat === b.lat && a.lng === b.lng;
-}
 
 export default function BookLocationScreen() {
   const router = useRouter();
@@ -31,16 +28,11 @@ export default function BookLocationScreen() {
   const [activeField, setActiveField] = useState<ActiveField>(
     destination ? 'destination' : 'pickup',
   );
+  const [customOpen, setCustomOpen] = useState(false);
+  const [currentLocationLoading, setCurrentLocationLoading] = useState(false);
 
   const activeLocation = activeField === 'pickup' ? pickupDraft : destinationDraft;
   const canContinue = pickupDraft.name.trim().length > 0 && destinationDraft.name.trim().length > 0;
-
-  const recentLocations = useMemo(() => {
-    const locations = [destinationDraft, pickupDraft, DEFAULT_PICKUP, ...DESTINATION_PRESETS];
-    return locations.filter(
-      (location, index) => locations.findIndex((item) => isSameLocation(item, location)) === index,
-    );
-  }, [destinationDraft, pickupDraft]);
 
   const updateLocationName = (field: ActiveField, name: string) => {
     if (field === 'pickup') {
@@ -51,21 +43,7 @@ export default function BookLocationScreen() {
     setDestinationDraft((current) => ({ ...current, name }));
   };
 
-  const updateActiveCoordinate = (key: 'lat' | 'lng', value: string) => {
-    if (activeField === 'pickup') {
-      setPickupDraft((current) => ({ ...current, [key]: value }));
-      return;
-    }
-
-    setDestinationDraft((current) => ({ ...current, [key]: value }));
-  };
-
-  const applyPickupLocation = (location: BookLocation) => {
-    setPickupDraft(location);
-    setActiveField('pickup');
-  };
-
-  const applyRecentLocation = (location: BookLocation) => {
+  const applyLocation = (location: BookLocation) => {
     if (activeField === 'pickup') {
       setPickupDraft(location);
       if (!destinationDraft.name.trim()) {
@@ -77,6 +55,16 @@ export default function BookLocationScreen() {
     setDestinationDraft(location);
     if (!pickupDraft.name.trim()) {
       setActiveField('pickup');
+    }
+  };
+
+  const onSelectCurrentLocation = async () => {
+    setCurrentLocationLoading(true);
+    try {
+      const location = await resolveCurrentLocation();
+      applyLocation({ name: location.name, lat: location.lat, lng: location.lng });
+    } finally {
+      setCurrentLocationLoading(false);
     }
   };
 
@@ -116,7 +104,7 @@ export default function BookLocationScreen() {
           <View className="rounded-2xl border border-goojol-border bg-goojol-surface">
             <Pressable
               onPress={() => setActiveField('pickup')}
-              className={`flex-row gap-3 p-4`}
+              className="flex-row gap-3 p-4"
               accessibilityRole="button"
               accessibilityLabel="Edit pickup location"
             >
@@ -138,11 +126,11 @@ export default function BookLocationScreen() {
               </VStack>
             </Pressable>
 
-            <View className="border-t border-goojol-border" />
+            <View className="border-goojol-border border-t" />
 
             <Pressable
               onPress={() => setActiveField('destination')}
-              className={`flex-row gap-3 p-4`}
+              className="flex-row gap-3 p-4"
               accessibilityRole="button"
               accessibilityLabel="Edit destination location"
             >
@@ -165,75 +153,25 @@ export default function BookLocationScreen() {
             </Pressable>
           </View>
 
-          <SavedAddressChips selected={pickupDraft} onSelect={applyPickupLocation} />
-
-          <VStack space="md">
-            <Text className="font-medium text-goojol-muted text-sm">
-              Custom {activeField === 'pickup' ? 'pickup' : 'destination'} coordinates
-            </Text>
-            <FormControl>
-              <FormControlLabel>
-                <FormControlLabelText className="text-goojol-muted">Latitude</FormControlLabelText>
-              </FormControlLabel>
-              <Input className="border-goojol-border bg-goojol-surface">
-                <InputField
-                  value={activeLocation.lat}
-                  onChangeText={(value) => updateActiveCoordinate('lat', value)}
-                  placeholder="-6.132290"
-                  placeholderTextColor="#8892a8"
-                  keyboardType="numeric"
-                  className="text-white"
-                />
-              </Input>
-            </FormControl>
-            <FormControl>
-              <FormControlLabel>
-                <FormControlLabelText className="text-goojol-muted">Longitude</FormControlLabelText>
-              </FormControlLabel>
-              <Input className="border-goojol-border bg-goojol-surface">
-                <InputField
-                  value={activeLocation.lng}
-                  onChangeText={(value) => updateActiveCoordinate('lng', value)}
-                  placeholder="106.801969"
-                  placeholderTextColor="#8892a8"
-                  keyboardType="numeric"
-                  className="text-white"
-                />
-              </Input>
-            </FormControl>
-          </VStack>
-
-          <VStack space="sm">
-            <Text className="font-medium text-goojol-muted text-sm">Recent</Text>
-            <View className="overflow-hidden rounded-2xl border border-goojol-border bg-goojol-surface">
-              {recentLocations.map((location, index) => (
-                <View key={`${location.name}-${location.lat}-${location.lng}`}>
-                  <Pressable
-                    onPress={() => applyRecentLocation(location)}
-                    className="flex-row items-center justify-between px-4 py-4 active:bg-goojol-sky"
-                    accessibilityRole="button"
-                    accessibilityLabel={`Use ${location.name} for ${activeField}`}
-                  >
-                    <View className="flex-row items-center gap-3">
-                      <Clock3 color="#8892a8" size={18} />
-                      <VStack space="xs">
-                        <Text className="text-base text-white">{location.name}</Text>
-                        <Text className="text-goojol-muted text-xs">
-                          {activeField === 'pickup' ? 'Set as pickup' : 'Set as destination'}
-                        </Text>
-                      </VStack>
-                    </View>
-                    <ArrowUpLeft color="#8892a8" size={18} />
-                  </Pressable>
-                  {index < recentLocations.length - 1 ? (
-                    <View className="ml-11 h-px bg-goojol-border" />
-                  ) : null}
-                </View>
-              ))}
-            </View>
-          </VStack>
+          <AddressSuggestions
+            query={activeLocation.name}
+            activeField={activeField}
+            onSelect={applyLocation}
+            onSelectCurrentLocation={onSelectCurrentLocation}
+            onCustomAddress={() => setCustomOpen(true)}
+            currentLocationLoading={currentLocationLoading}
+          />
         </VStack>
       </ScrollView>
+
+      <AddSavedAddressModal
+        open={customOpen}
+        onClose={() => setCustomOpen(false)}
+        initialName={activeLocation.name.trim()}
+        initialLat={activeLocation.lat}
+        initialLng={activeLocation.lng}
+        onSaved={applyLocation}
+      />
     </WizardShell>
   );
 }

@@ -3,6 +3,8 @@ import { ArrowUpLeft, Clock3, LucideMapPinHouse, LucideMapPinned } from 'lucide-
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { Button, ButtonText } from '@/components/ui/button';
+import { FormControl, FormControlLabel, FormControlLabelText } from '@/components/ui/form-control';
+import { HStack } from '@/components/ui/hstack';
 import { Input, InputField } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
@@ -11,7 +13,7 @@ import { useBook } from '@/feature/book/book-context';
 import { LocationMap } from '@/feature/book/components/location-map';
 import { WizardShell } from '@/feature/book/components/wizard-shell';
 import type { BookLocation } from '@/feature/book/dispatch.schema';
-import { HStack } from '@/components/ui/hstack';
+import { SavedAddressChips } from '@/feature/saved-address/components/saved-address-chips';
 
 type ActiveField = 'pickup' | 'destination';
 
@@ -47,6 +49,20 @@ export default function BookLocationScreen() {
     }
 
     setDestinationDraft((current) => ({ ...current, name }));
+  };
+
+  const updateActiveCoordinate = (key: 'lat' | 'lng', value: string) => {
+    if (activeField === 'pickup') {
+      setPickupDraft((current) => ({ ...current, [key]: value }));
+      return;
+    }
+
+    setDestinationDraft((current) => ({ ...current, [key]: value }));
+  };
+
+  const applyPickupLocation = (location: BookLocation) => {
+    setPickupDraft(location);
+    setActiveField('pickup');
   };
 
   const applyRecentLocation = (location: BookLocation) => {
@@ -148,6 +164,44 @@ export default function BookLocationScreen() {
               </VStack>
             </Pressable>
           </View>
+
+          <SavedAddressChips selected={pickupDraft} onSelect={applyPickupLocation} />
+
+          <VStack space="md">
+            <Text className="font-medium text-goojol-muted text-sm">
+              Custom {activeField === 'pickup' ? 'pickup' : 'destination'} coordinates
+            </Text>
+            <FormControl>
+              <FormControlLabel>
+                <FormControlLabelText className="text-goojol-muted">Latitude</FormControlLabelText>
+              </FormControlLabel>
+              <Input className="border-goojol-border bg-goojol-surface">
+                <InputField
+                  value={activeLocation.lat}
+                  onChangeText={(value) => updateActiveCoordinate('lat', value)}
+                  placeholder="-6.132290"
+                  placeholderTextColor="#8892a8"
+                  keyboardType="numeric"
+                  className="text-white"
+                />
+              </Input>
+            </FormControl>
+            <FormControl>
+              <FormControlLabel>
+                <FormControlLabelText className="text-goojol-muted">Longitude</FormControlLabelText>
+              </FormControlLabel>
+              <Input className="border-goojol-border bg-goojol-surface">
+                <InputField
+                  value={activeLocation.lng}
+                  onChangeText={(value) => updateActiveCoordinate('lng', value)}
+                  placeholder="106.801969"
+                  placeholderTextColor="#8892a8"
+                  keyboardType="numeric"
+                  className="text-white"
+                />
+              </Input>
+            </FormControl>
+          </VStack>
 
           <VStack space="sm">
             <Text className="font-medium text-goojol-muted text-sm">Recent</Text>

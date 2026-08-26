@@ -1,9 +1,8 @@
 package controller
 
 import (
+	"log"
 	"net/http"
-	"os"
-	"strings"
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatchws/service"
 	"github.com/gin-gonic/gin"
@@ -28,7 +27,6 @@ func NewDispatchWSController(s service.DispatchWSService) DispatchWSController {
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
-			CheckOrigin:     checkOrigin,
 		},
 	}
 }
@@ -49,25 +47,19 @@ func (c *dispatchWSController) serve(ctx *gin.Context, handle func(userID string
 		return
 	}
 
-	conn, err := c.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	var respHeader http.Header
+	if proto := ctx.GetHeader("Sec-WebSocket-Protocol"); proto != "" {
+		respHeader = http.Header{"Sec-WebSocket-Protocol": []string{proto}}
+	}
+
+	c.upgrader.CheckOrigin = func(r *http.Request) bool {
+		return true // Blindly trust it(?)
+	}
+	conn, err := c.upgrader.Upgrade(ctx.Writer, ctx.Request, respHeader)
 	if err != nil {
+		log.Print(err)
 		return
 	}
 
 	handle(id, conn)
-}
-
-func checkOrigin(r *http.Request) bool {
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return true
-	}
-
-	raw := os.Getenv("CORS_ALLOWED_ORIGINS")
-	for allowed := range strings.SplitSeq(raw, ",") {
-		if strings.TrimSpace(allowed) == origin {
-			return true
-		}
-	}
-	return false
 }

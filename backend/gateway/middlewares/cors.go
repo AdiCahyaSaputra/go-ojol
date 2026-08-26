@@ -13,7 +13,8 @@ func CORSMiddleware() gin.HandlerFunc {
 		allowedOrigins := config.SetUpCors()
 		origin := c.Request.Header.Get("Origin")
 
-		if slices.Contains(allowedOrigins, origin) {
+		// NOTE: mobile apps has empty origin. Can cause security issue in the future but let's allow that
+		if origin != "" && slices.Contains(allowedOrigins, origin) {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Vary", "Origin")
 		}

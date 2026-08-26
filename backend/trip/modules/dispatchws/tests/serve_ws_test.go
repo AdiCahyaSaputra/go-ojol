@@ -62,6 +62,43 @@ func TestServeWS_DeniesWhenUnauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
 
+func TestServeWS_AllowsOriginMatchingRequestHost(t *testing.T) {
+	server, sign, _, _ := newDispatchWSServer(t, true, true)
+	defer server.Close()
+
+	u, err := url.Parse(server.URL)
+	require.NoError(t, err)
+
+	conn, resp, err := websocket.DefaultDialer.Dial(
+		wsURL(server.URL),
+		http.Header{
+			"Authorization": []string{"Bearer " + sign(testDriverUserID, "drv@example.com", "driver")},
+			"Origin":        []string{"http://" + u.Host},
+		},
+	)
+	require.NoError(t, err)
+	defer conn.Close()
+	require.NotNil(t, resp)
+	assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
+}
+
+func TestServeWS_RejectsUnknownOrigin(t *testing.T) {
+	t.Setenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+	server, sign, _, _ := newDispatchWSServer(t, true, true)
+	defer server.Close()
+
+	_, resp, err := websocket.DefaultDialer.Dial(
+		wsURL(server.URL),
+		http.Header{
+			"Authorization": []string{"Bearer " + sign(testDriverUserID, "drv@example.com", "driver")},
+			"Origin":        []string{"http://evil.example"},
+		},
+	)
+	require.Error(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+}
+
 func TestServeWS_StandbyThenFindDriver(t *testing.T) {
 	server, sign, _, _ := newDispatchWSServer(t, true, true)
 	defer server.Close()

@@ -7,11 +7,11 @@ export default function LoginPage() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#0F1729' }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 64 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >

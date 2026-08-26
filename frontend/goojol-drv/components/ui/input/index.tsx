@@ -82,6 +82,7 @@ const InputField = React.forwardRef<React.ComponentRef<typeof UIInput.Input>, II
       <UIInput.Input
         ref={ref}
         {...props}
+        autoCapitalize="none"
         style={Platform.OS === 'ios' ? { lineHeight: 0 } : {}}
         className={inputFieldStyle({
           class: className,

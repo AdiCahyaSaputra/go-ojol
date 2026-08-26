@@ -1,0 +1,26 @@
+[
+	{
+		"ptype": "p",
+		"v0": "customer",
+		"v1": "saved_address",
+		"v2": "create"
+	},
+	{
+		"ptype": "p",
+		"v0": "customer",
+		"v1": "saved_address",
+		"v2": "read"
+	},
+	{
+		"ptype": "p",
+		"v0": "customer",
+		"v1": "saved_address",
+		"v2": "update"
+	},
+	{
+		"ptype": "p",
+		"v0": "customer",
+		"v1": "saved_address",
+		"v2": "delete"
+	}
+]

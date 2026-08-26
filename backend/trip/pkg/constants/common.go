@@ -11,8 +11,9 @@ const (
 	ENUM_ROLE_CUSTOMER = "customer"
 	ENUM_ROLE_DRIVER   = "driver"
 
-	ENUM_RESOURCE_TRIP     = "trip"
-	ENUM_RESOURCE_DISPATCH = "dispatch"
+	ENUM_RESOURCE_TRIP          = "trip"
+	ENUM_RESOURCE_DISPATCH      = "dispatch"
+	ENUM_RESOURCE_SAVED_ADDRESS = "saved_address"
 
 	ENUM_ACTION_CREATE = "create"
 	ENUM_ACTION_READ   = "read"

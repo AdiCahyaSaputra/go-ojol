@@ -10,6 +10,9 @@ import (
 	dispatchService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatch/service"
 	dispatchwsController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatchws/controller"
 	dispatchwsService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatchws/service"
+	savedAddressController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/saved_address/controller"
+	savedAddressRepository "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/saved_address/repository"
+	savedAddressService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/saved_address/service"
 	tripController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/controller"
 	pkgcasbin "github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/casbin"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
@@ -77,5 +80,11 @@ func RegisterDependencies(injector *do.Injector) {
 
 	do.Provide(injector, func(i *do.Injector) (dispatchController.DispatchController, error) {
 		return dispatchController.NewDispatchController(i, dispatchSvc), nil
+	})
+
+	savedAddressRepo := savedAddressRepository.NewSavedAddressRepository(db)
+	savedAddressSvc := savedAddressService.NewSavedAddressService(savedAddressRepo, db)
+	do.Provide(injector, func(i *do.Injector) (savedAddressController.SavedAddressController, error) {
+		return savedAddressController.NewSavedAddressController(i, savedAddressSvc), nil
 	})
 }

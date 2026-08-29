@@ -1,145 +1,229 @@
 # Architecture
 
-Ride-hailing backend (`go-ojol`): three Go/Gin services behind a reverse-proxy gateway. Auth is the identity issuer. Other services verify access tokens from Auth’s JWKS. Each service is its own Go module and follows the same clean-architecture layout.
+Three Go services behind a path-based gateway, plus two Expo apps. Auth issues ES256 access tokens. Trip (and anyone else) fetches Auth's JWKS and verifies locally. The gateway does not check JWT. It forwards the request, `Authorization` included.
+
+Auth and Trip currently share one Postgres. That is a local-dev shortcut, not a boundary. Auth owns `users`, `sessions`, and `casbin_rules`. Trip owns `transactions` and the live matching loop.
 
 ## Stack
 
-### Implemented (this repo)
-
-| Layer | Choice |
+| Layer | What we use |
 |---|---|
 | Language | Go 1.26 |
 | HTTP | Gin |
 | Gateway | `httputil.ReverseProxy` |
 | DI | [`samber/do`](https://github.com/samber/do) |
 | ORM | GORM + PostgreSQL (`uuid-ossp`) |
-| Authentication | JWT ES256 (P-256) + JWKS |
-| Authorization | Casbin RBAC (`sub, obj, act`) |
+| Authn | JWT ES256 (P-256) + JWKS + server-side sessions |
+| Authz | Casbin RBAC (`sub, obj, act`) |
 | Validation | `go-playground/validator` |
 | Live reload | Air |
-| Realtime | WebSocket (`GET /api/trip/dispatch/ws`) |
-| Live tracking | Redis geo (`drivers:standby`) |
-
-### Product targets (not in this repo yet)
-
-| Layer | Choice |
-|---|---|
-| Maps | MapLibre + OSM |
+| Routing | OSRM (`GET /route/v1/driving/...`) |
+| Standby geo | Redis `GEOSEARCH` on `drivers:standby` |
+| Trip positions | Redis hashes `trip:{id}:driver` / `trip:{id}:customer` |
+| Clients | Expo 56, NativeWind, MapLibre + OSM raster tiles |
 | Location | Expo Location |
-| Routing | OSRM |
-| Geocoding | Photon (self-hostable) |
-| Payment | Midtrans / dummy |
-| Push | Expo Notifications |
-| Client | Expo |
 
-## System topology
+Not in the product yet: address search (Photon or otherwise), push, a real payment provider. Completing a trip stamps `paid_at` and that is the whole settlement story.
 
-Clients talk only to the gateway. The gateway does not verify JWT; it forwards `Authorization` and other hop-by-hop headers to the upstream. Auth publishes public keys at `/.well-known/jwks.json`. Trip fetches that document and verifies tokens locally.
+A local Indonesia OSRM graph lives under `backend/trip/docker/osrm` and publishes host port 5001. Trip still defaults to `https://router.project-osrm.org` because `providers/core.go` passes an empty base URL. Point it at `http://127.0.0.1:5001` before you rely on Jakarta routes staying up.
+
+## Topology
+
+Clients talk only to the gateway. Auth publishes keys at `/.well-known/jwks.json`. Trip caches that document for 5 minutes, then checks `alg`, `kid`, `iss`, and that the `session_id` claim is still an unrevoked row in `sessions`.
 
 ```mermaid
 flowchart LR
-  Client["Client"] -->|"HTTP"| GW["Gateway"]
+  Cst["goojol-cst"] -->|"HTTP + WS"| GW["Gateway"]
+  Drv["goojol-drv"] -->|"HTTP + WS"| GW
 
-  GW -->|"/api/auth<br/>/api/user<br/>/.well-known/jwks.json"| Auth["Auth"]
+  GW -->|"/api/auth<br/>/.well-known/jwks.json"| Auth["Auth"]
   GW -->|"/api/trip"| Trip["Trip"]
 
-  Auth --> AuthDB[("PostgreSQL")]
-  Trip --> TripDB[("PostgreSQL")]
-  Trip --> Redis[("Redis geo")]
+  Auth --> PG[("PostgreSQL")]
+  Trip --> PG
+  Trip --> Redis[("Redis")]
   Trip -.->|"GET JWKS"| Auth
+  Trip -.->|"route"| OSRM["OSRM"]
 ```
 
-Each service reads its own `DB_*` env, but Auth and Trip shared one Postgres. Auth is the source of truth for `users` and `casbin_rules`. Trip currently authenticates from JWT claims only (`user_id`, `email`, `role`).
-
-## Services
-
-| Service | Module | Role |
-|---|---|---|
-| Gateway | `backend/gateway` | Path-based reverse proxy. No database. |
-| Auth | `backend/auth` | Register / login, JWKS, user CRUD, Casbin. |
-| Trip | `backend/trip` | Downstream consumer of Auth JWTs. Fare quotes, nearby-driver lookup, driver standby WebSocket. |
-
-Default listen address is `GOLANG_PORT` (fallback `8888`). On `APP_ENV=localhost` the bind host is `0.0.0.0`.
+Each process binds `GOLANG_PORT` (fallback `8888`). `APP_ENV=localhost` binds `0.0.0.0`. HTTP fixtures in `tests/http` assume the gateway at `http://localhost:8001`, so give Auth and Trip different ports and point the gateway at those URLs.
 
 ### Gateway routing
 
-Configured in `backend/gateway/cmd/main.go`. Requires `AUTH_SERVICE_URL` and `TRIP_SERVICE_URL`.
+Configured in `backend/gateway/cmd/main.go`. Needs `AUTH_SERVICE_URL` and `TRIP_SERVICE_URL`.
 
-| Upstream env | Paths |
+| Upstream | Paths |
 |---|---|
-| `AUTH_SERVICE_URL` | `/.well-known/jwks.json`, `/api/auth`, `/api/auth/*path`, `/api/user`, `/api/user/*path` |
+| `AUTH_SERVICE_URL` | `/.well-known/jwks.json`, `/api/auth`, `/api/auth/*path` |
 | `TRIP_SERVICE_URL` | `/api/trip`, `/api/trip/*path` |
 
-The proxy uses `Rewrite` (`SetURL` + `SetXForwarded`) so the original path, method, body, and `Authorization` header reach the upstream unchanged.
+`Rewrite` (`SetURL` + `SetXForwarded`) keeps path, method, body, and headers. WebSocket upgrades go through the same `Any` routes. User CRUD is under `/api/auth/user`, not `/api/user`.
 
-### API surface
+## Clients
 
-**Auth** (`backend/auth/modules/auth/routes.go`, `backend/auth/modules/user/routes.go`)
+`frontend/goojol-cst` is the customer app. `frontend/goojol-drv` is the driver app. Both hit `EXPO_PUBLIC_API_URL` over HTTP and `EXPO_PUBLIC_WS_URL` for dispatch sockets. Access tokens go out as `Authorization: Bearer` on HTTP and as the WebSocket subprotocol on upgrade (`new WebSocket(url, [accessToken])`). Axios refreshes on 401 via `POST /api/auth/refresh`.
+
+Customer book flow: pick pickup/drop on a MapLibre map (or a saved address), quote via `calculate-argo`, search via `find-driver`, then sit on `/book/trip` once a driver accepts. `ActiveTripRecovery` reopens that screen if the process dies mid-ride.
+
+Driver standby flow: go online, receive `trip_offer`, accept or reject, start, complete. The same socket carries customer GPS after match.
+
+## Ride lifecycle
+
+A transaction is born in dispatch, then the trip module owns status changes.
+
+```mermaid
+stateDiagram-v2
+  [*] --> offered: find-driver
+  offered --> accepted_offer: driver accept
+  offered --> rejected_offer: every offered driver rejects
+  offered --> expired: 30s timeout
+  accepted_offer --> on_the_way: driver start
+  accepted_offer --> cancelled: customer or driver cancel
+  on_the_way --> completed: driver complete
+  on_the_way --> cancelled: customer or driver cancel
+  completed --> [*]
+  cancelled --> [*]
+  expired --> [*]
+  rejected_offer --> [*]
+```
+
+`pending` is still in the Postgres enum from the original table. Live matching never writes it.
+
+1. Customer `GET /api/trip/dispatch/customer/calculate-argo` with repeated `pickup_loc` / `destination` query pairs. Trip asks OSRM, then prices each distinct `(vehicle_type, max_size)` from `vehicles`. Motorcycle is Rp 2.500/km, car Rp 4.500/km, plus 2% per extra seat and a 10% platform cut.
+2. Customer `POST /api/trip/dispatch/customer/find-driver` with pickup, destination, `vehicle_type`, `max_size`. Redis geo lookup, 3 km, 10 results, filtered to matching vehicles. If nobody is around the customer gets `no_drivers` on their socket and an empty `drivers` array.
+3. Otherwise Trip inserts a row at `offered` and pushes `trip_offer` to those drivers (30s TTL). The customer gets `waiting`. Pending offers live in process memory. A Trip restart drops them; the row can still expire in Postgres.
+4. Driver `POST /api/trip/dispatch/driver/offers/:id/respond` with `accept` or `reject`. First accept claims the row (`accepted_offer`), assigns driver and vehicle, pulls the winner off standby, tells the customer `driver_matched`, and tells the rest `offer_taken`. If every pending driver rejects, status becomes `rejected_offer` and the customer gets `offer_rejected`. Timeout writes `expired`.
+5. Customer can send `{ "type": "retry" }` on the customer socket. That reruns the last search unless an offer is still live.
+6. Driver `POST /api/trip/transactions/:id/start` moves `accepted_offer` → `on_the_way`. Both sockets get `trip_status`.
+7. During `accepted_offer` or `on_the_way`, either side sends `{ "type": "trip_location", "transaction_id", "lat", "lng" }`. Trip writes Postgres (`driver_last_lat_long` / `customer_last_lat_long`), Redis hashes with a 24h TTL, and notifies the counterpart (`driver_location` / `customer_location`). `GET /api/trip/transactions/active` prefers Redis when a hash exists.
+8. Driver `POST .../complete` moves `on_the_way` → `completed`, sets `paid_at` to now, clears Redis, broadcasts `trip_completed`. Either participant `POST .../cancel` from `accepted_offer` or `on_the_way`.
+
+"Active" means `accepted_offer` or `on_the_way`. Offers do not count. Reopen the app and `GET /transactions/active` is how both clients recover.
+
+```mermaid
+sequenceDiagram
+  participant C as Customer
+  participant G as Gateway
+  participant T as Trip
+  participant D as Driver
+  participant R as Redis
+
+  C->>G: POST /dispatch/customer/find-driver
+  G->>T: same request
+  T->>R: GEOSEARCH drivers:standby
+  T-->>D: WS trip_offer
+  T-->>C: WS waiting
+  D->>G: POST /offers/:id/respond accept
+  T-->>C: WS driver_matched
+  D->>G: POST /transactions/:id/start
+  T-->>C: WS trip_status on_the_way
+  D->>T: WS trip_location
+  T->>R: HSET trip:{id}:driver
+  T-->>C: WS driver_location
+  D->>G: POST /transactions/:id/complete
+  T-->>C: WS trip_completed
+```
+
+## HTTP API
+
+JSON envelope is `{ status, message, data }` from `pkg/utils`. Paginated user list adds pagination metadata. CORS origins come from `CORS_ALLOWED_ORIGINS` (comma-separated). Credentials are allowed.
+
+Guards are JWT + live session, then Casbin. Trip also runs `ResolveProfileId`, which loads `customer` or `driver` from `user_id` and puts the row on context. Admin tokens die there on trip routes. That is on purpose.
+
+### Auth (`/api/auth`)
 
 | Method | Path | Guard |
 |---|---|---|
 | `GET` | `/.well-known/jwks.json` | public (`Cache-Control: public, max-age=300`) |
-| `POST` | `/api/auth/register` | public (`role` must be `customer` or `driver`) |
-| `POST` | `/api/auth/login` | public |
-| `POST` | `/api/auth/logout` | public stub (no `Authenticate`; handler expects `user_id`) |
-| `GET` | `/api/user` | JWT + Casbin `user:read` (paginated) |
-| `GET` | `/api/user/me` | JWT + Casbin `user:read` |
-| `PUT` | `/api/user/:id` | JWT + Casbin `user:update` (uses token `user_id`, not `:id`) |
-| `DELETE` | `/api/user/:id` | JWT + Casbin `user:delete` (uses token `user_id`, not `:id`) |
+| `POST` | `/api/auth/register` | public (`role` is `customer` or `driver`) |
+| `POST` | `/api/auth/login` | public, 4 failures / 15 min per IP+email |
+| `POST` | `/api/auth/refresh` | public (`refresh_token` body) |
+| `POST` | `/api/auth/logout` | JWT + session |
+| `POST` | `/api/auth/logout-all` | JWT + session |
+| `GET` | `/api/auth/sessions` | JWT + session |
+| `DELETE` | `/api/auth/sessions/:id` | JWT + session |
+| `GET` | `/api/auth/user` | JWT + `user:read` (paginated) |
+| `GET` | `/api/auth/user/me` | JWT + `user:read` |
+| `PUT` | `/api/auth/user/:id` | JWT + `user:update` (uses token `user_id`, ignores `:id`) |
+| `DELETE` | `/api/auth/user/:id` | JWT + admin + `user:delete` |
 
-**Trip** (`backend/trip/modules/trip/routes.go`, `backend/trip/modules/dispatch/routes.go`, `backend/trip/modules/dispatchws/routes.go`)
+Password-reset DTOs exist. There are no routes for them.
+
+### Trip (`/api/trip`)
 
 | Method | Path | Guard |
 |---|---|---|
-| `GET` | `/api/trip/protected` | JWT + Casbin `trip:read` |
-| `GET` | `/api/trip/dispatch/calculate-argo` | JWT + Casbin `trip:read` |
-| `GET` | `/api/trip/dispatch/find-driver` | JWT + Casbin `trip:read` |
-| `GET` | `/api/trip/dispatch/ws` | JWT + Casbin `trip:update` (WebSocket upgrade) |
+| `GET` | `/protected` | `trip:read` |
+| `GET` | `/transactions/active` | profile + `trip:read` |
+| `GET` | `/transactions/:id` | profile + `trip:read`, participant only |
+| `POST` | `/transactions/:id/start` | driver + `trip:update` |
+| `POST` | `/transactions/:id/complete` | driver + `trip:update` |
+| `POST` | `/transactions/:id/cancel` | profile + `trip:update` |
+| `GET` | `/dispatch/customer/calculate-argo` | customer + `dispatch:read` |
+| `POST` | `/dispatch/customer/find-driver` | customer + `dispatch:create` |
+| `POST` | `/dispatch/driver/mode` | driver + `dispatch:update` (`online` / `offline`) |
+| `POST` | `/dispatch/driver/offers/:transaction_id/respond` | driver + `dispatch:update` |
+| `GET` | `/dispatch/ws` | driver + `trip:update` (WebSocket) |
+| `GET` | `/dispatch/customer/ws` | customer + `dispatch:create` (WebSocket) |
+| `GET/POST/PUT/DELETE` | `/saved-addresses` | customer + `saved_address:*` |
 
-`calculate-argo` takes `pickup_loc` and `destination` as repeated query params (`lat`, `lng`) plus `vehicle_type`.
+### WebSocket messages
 
-`find-driver` takes `current_location` as repeated query params (`lat`, `lng`) and returns nearby standby members from Redis. Members are JWT `user_id` values until driver-table integration.
+One connection per user per role map. A second connect closes the previous. Driver disconnect removes the geo member. Ping every 30s, 60s pong wait.
 
-Driver standby WebSocket (`GET /api/trip/dispatch/ws`): Bearer header or `?token=`. One connection per user; a new connect closes the previous. Messages:
+Driver client:
 
 ```json
 {"type":"standby","lat":-6.2088,"lng":106.8456}
 {"type":"location","lat":-6.2089,"lng":106.8457}
+{"type":"trip_location","transaction_id":"...","lat":-6.21,"lng":106.85}
 ```
 
-Server replies `{"type":"standby_ok"}` or `{"type":"error","message":"..."}`. Disconnect removes the geo member.
+Customer client:
 
-Redis key: `drivers:standby` (`GEOADD` / `GEORADIUS` / `ZREM`). Default search radius is 3 km, count 10.
+```json
+{"type":"retry"}
+{"type":"trip_location","transaction_id":"...","lat":-6.21,"lng":106.85}
+```
 
-## Clean architecture
+Server types: `standby_ok`, `error`, `trip_offer`, `offer_taken`, `offer_expired`, `waiting`, `driver_matched`, `offer_rejected`, `no_drivers`, `driver_location`, `customer_location`, `trip_status`, `trip_completed`.
 
-Every feature lives under `modules/<name>/`. Dependencies point inward: HTTP → application → persistence. Gin and GORM stay at the edges. Wiring happens in `providers/core.go`, not in controllers.
+Redis standby key is `drivers:standby` (`GEOADD` / `GEOSEARCH` / `ZREM`).
+
+## Module layout
+
+Each Go service is its own module. Features live under `modules/<name>/`. HTTP and GORM stay at the edges. Constructors go in `providers/core.go`.
 
 ```
 cmd/main.go                 boot Gin, CORS, register module routes
-providers/core.go           DI construct DB, JWT/JWKS, Casbin, controllers
+providers/core.go           DI: DB, Redis, JWT/JWKS, Casbin, controllers
 modules/<feature>/
-  routes.go                 path groups + middleware
-  controller/               HTTP bind / status / response envelope
-  validation/               request validation
-  service/                  use cases
-  repository/               GORM writes / lookups
+  routes.go
+  controller/
+  validation/
+  service/
+  repository/
   query/                    list/filter (pagination)
-  dto/                      request/response types
+  dto/
   tests/
-middlewares/                CORS, Authenticate, Authorize
-database/
-  entities/                 GORM models
-  migrations/               registered up/down (Like laravel)
-  seeders/
-pkg/                        shared helpers (casbin, jwks, constants, utils)
-script/                     CLI: migrate, seed, --script:<name>
+middlewares/
+database/entities
+database/migrations         registered up/down, recorded in a `migrations` batch table
+database/seeders/
+pkg/
+script/                     migrate, seed, --script:<name>
 ```
+
+`make module name=<feature>` scaffolds that tree. Register routes in `cmd/main.go` and constructors in `providers/core.go`.
+
+Auth DI: Postgres → JWT → Casbin → user/session repos → services → controllers.
+
+Trip DI: Postgres → Redis → JWKS verifier → session checker → Casbin → `drivergeo` + `triploc` → dispatch WS hub → dispatch service (also the offer retrier) → trip service (also the `trip_location` handler) → saved-address.
 
 ```mermaid
 flowchart TB
   subgraph http [HTTP]
-    Routes --> MW[Authenticate / Authorize]
+    Routes --> MW[Authenticate / Authorize / ResolveProfileId]
     MW --> Controller
   end
 
@@ -152,7 +236,6 @@ flowchart TB
     Service --> Repository
     Service --> Query
     Repository --> Entities
-    Query --> Entities
   end
 
   Providers["providers/core.go"] -.-> Controller
@@ -160,29 +243,22 @@ flowchart TB
   Providers -.-> Repository
 ```
 
-`make module name=<feature>` (`create_module.sh`) scaffolds that tree. New routes must be registered in `cmd/main.go` and new constructors in `providers/core.go`.
-
-Auth DI (`backend/auth/providers/core.go`): Postgres → JWT service → Casbin enforcer → user/casbin repositories → user/auth services → controllers.
-
-Trip DI (`backend/trip/providers/core.go`): Postgres → Redis → JWKS verifier → Casbin enforcer → trip / dispatch / dispatchws controllers.
-
 ## Authentication
 
-Auth signs access tokens with an ECDSA P-256 private key (`JWT_PRIVATE_KEY_PATH`). Algorithm is **ES256**. Default issuer is `go-ojol-auth` (`JWT_ISSUER`). Key id is `JWT_KID`, or a JWK thumbprint if unset.
-
-Access token claims:
+Auth signs with an ECDSA P-256 private key (`JWT_PRIVATE_KEY_PATH`). Algorithm is ES256. Default issuer is `go-ojol-auth` (`JWT_ISSUER`). Key id is `JWT_KID`, or a JWK thumbprint if unset.
 
 | Claim | Source |
 |---|---|
 | `user_id` | `users.id` |
 | `email` | `users.email` |
 | `role` | first Casbin grouping role for that email |
+| `session_id` | `sessions.id` |
 | `iss` | `JWT_ISSUER` |
-| `iat` / `exp` | issued now, **15 minutes** |
+| `iat` / `exp` | issued now, 15 minutes |
 
-The public JWK is served at `GET /.well-known/jwks.json`. Trip (`AUTH_JWKS_URL`) caches keys for 5 minutes, then verifies `alg=ES256`, `kid`, and `iss` before putting `user_id`, `email`, and `role` on the Gin context.
+Login returns `access_token`, `refresh_token`, and `role`. The refresh token is opaque, stored as a hash on `sessions`, and lasts 7 days. Refresh rotates it. Logout revokes that session. Logout-all revokes every session for the user.
 
-Refresh-token helpers exist on the JWT service (7-day opaque token) but login currently returns only `access_token` and `role`. Refresh and password-reset DTOs have no routes. Logout is a no-op and is not behind `Authenticate`. Trip enforces Casbin the same way Auth does: `Authenticate` then `Authorize(enforcer, resource, action)` using the email from the token. WebSocket handshakes also accept `?token=` when `Authorization` is absent.
+Trip (`AUTH_JWKS_URL`) verifies `alg=ES256`, `kid`, and `iss`, then `sessions.IsActive`. A revoked session makes a still-unexpired JWT useless. That is the whole point of putting `session_id` on the access token.
 
 ```mermaid
 sequenceDiagram
@@ -193,18 +269,18 @@ sequenceDiagram
 
   C->>G: POST /api/auth/login
   G->>A: POST /api/auth/login
-  A->>A: bcrypt + Casbin role
-  A-->>C: access_token (ES256)
+  A->>A: bcrypt + session row + Casbin role
+  A-->>C: access_token + refresh_token
 
-  C->>G: GET /api/trip/protected<br/>Authorization Bearer
+  C->>G: GET /api/trip/transactions/active
   G->>T: same request
   T->>A: GET /.well-known/jwks.json
   A-->>T: keys
-  T->>T: verify ES256 + iss + kid
-  T-->>C: user_id, email, role
+  T->>T: verify ES256 + iss + kid + session
+  T-->>C: active transaction or 404
 ```
 
-## Authorization (Casbin)
+## Authorization
 
 Model (`backend/auth/pkg/casbin/rbac_model.conf`):
 
@@ -215,29 +291,21 @@ g, <user_email>, <role>
 
 Matcher: `g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act`.
 
-Roles: `admin`, `customer`, `driver`. Policies on `user` (`read` / `update` / `delete`) and `trip` (`create` / `read` / `update` / `delete`). Customer dispatch uses `trip:read` (calculate-argo and find-driver). Driver standby WebSocket uses `trip:update`. Register writes `g, <email>, <customer|driver>` in the same transaction as the user row, then reloads the enforcer.
+Roles: `admin`, `customer`, `driver`. Resources: `user`, `trip`, `dispatch`, `saved_address`. Actions: `create`, `read`, `update`, `delete`.
 
-Policies live in `casbin_rules` via a GORM Casbin adapter. Seed JSON:
+Policies live in `casbin_rules` via a GORM adapter. Seed JSON under `backend/auth/database/seeders/json/` (`casbin_policies.json`, `casbin_grouping.json`, `casbin_dispatch.json`, `casbin_saved_address.json`). `make seed` loads every `casbin_*.json` file. The CLI `go run cmd/main.go --script:casbin_seed` only rewrites the user/trip policy + grouping files. When you add a `casbin_*` resource, update that script **and** the JSON the seeder actually reads.
 
-- `backend/auth/database/seeders/json/casbin_policies.json`
-- `backend/auth/database/seeders/json/casbin_grouping.json`
-
-CLI: `go run cmd/main.go --script:casbin_seed` (no extra flags). When adding a `casbin_*` resource (e.g. `casbin_trip`), update the script **and** both JSON files.
-
-Auth middleware chain on `/api/user`: `Authenticate(jwt)` then `Authorize(enforcer, resource, action)` using the email from the token. Trip dispatch routes use the same pattern against the shared `casbin_rules` table.
-
-## Request envelopes
-
-JSON responses use `pkg/utils` builders: `{ status, message, data }` (plus pagination metadata on `GET /api/user`). CORS origins come from `CORS_ALLOWED_ORIGINS` (comma-separated); credentials are allowed.
+Register writes `g, <email>, <customer|driver>` in the same transaction as the user row, then reloads the enforcer.
 
 ## Database
 
-GORM entities in `database/entities` are the schema. Migrations call `AutoMigrate` after creating Postgres enums. Auth seeders load vehicles, users, and Casbin rules. Trip currently mirrors the same entity/migration set from the service template; treat Auth as owner of identity tables until Trip domain writes exist.
+GORM entities in `database/entities` are the schema. Migrations call `AutoMigrate` after creating enums. Auth seeders load vehicles, users, and Casbin rules. Trip mirrors a lot of the identity tables so it can join `drivers` / `customers` without a network hop. Treat Auth migrations as the source of truth for users and sessions. Run Trip migrations for transaction columns and enums.
 
 ```mermaid
 erDiagram
   users ||--o| customers : has
   users ||--o| drivers : has
+  users ||--o{ sessions : signs_in
   customers ||--o{ saved_addresses : saves
   customers ||--o{ transactions : books
   drivers ||--o{ transactions : drives
@@ -250,6 +318,13 @@ erDiagram
     varchar email UK
     varchar password
   }
+  sessions {
+    uuid id PK
+    uuid user_id FK
+    varchar refresh_token_hash UK
+    timestamptz expires_at
+    timestamptz revoked_at
+  }
   casbin_rules {
     uuid id PK
     casbin_rule_ptype ptype
@@ -257,155 +332,57 @@ erDiagram
     varchar v1
     varchar v2
   }
-  customers {
-    uuid id PK
-    uuid user_id FK
-    varchar name
-    varchar phone_number
-  }
-  drivers {
-    uuid id PK
-    uuid user_id FK
-    uuid vehicle_id FK
-    varchar name
-    varchar phone_number
-    text address
-  }
-  vehicles {
-    uuid id PK
-    varchar name
-    varchar license_number
-    int max_size
-    vehicle_type type
-  }
-  saved_addresses {
-    uuid id PK
-    uuid customer_id FK
-    varchar name
-    varchar lat_long
-    boolean is_default_pickup
-  }
   transactions {
     uuid id PK
     uuid customer_id FK
     uuid driver_id FK
     uuid vehicle_id FK
-    transaction_status status
+    varchar pickup_lat_long
+    varchar destination_lat_long
+    varchar driver_last_lat_long
+    varchar customer_last_lat_long
+    int distance
     int total_fare
-  }
-  payouts {
-    uuid id PK
-    uuid driver_id FK
-    int amount
-    payout_status status
+    transaction_status status
+    timestamptz paid_at
   }
 ```
+
+Coordinates are `varchar(40)[]` `[lat, lng]` pairs, not PostGIS. Driver and vehicle FKs on `transactions` are nullable so an `offered` row can exist before anyone accepts.
 
 ```sql
-create extension if not exists "uuid-ossp";
-
-create table users (
-  id uuid primary key default uuid_generate_v4(),
-  email varchar(150) unique not null,
-  password varchar(255) not null,
-  created_at timestamptz,
-  updated_at timestamptz
+create type transaction_status as enum (
+  'pending',
+  'offered',
+  'accepted_offer',
+  'rejected_offer',
+  'on_the_way',
+  'completed',
+  'expired',
+  'cancelled'
 );
 
-create type casbin_rule_ptype as enum ('p', 'g');
+-- last_lat_long was renamed; customer GPS and settlement time came later
+alter table transactions rename column last_lat_long to driver_last_lat_long;
+alter table transactions add column customer_last_lat_long varchar(40)[];
+alter table transactions add column paid_at timestamptz;
 
-create table casbin_rules (
-  id uuid primary key default uuid_generate_v4(),
-  ptype casbin_rule_ptype not null,
-  v0 varchar(255),
-  v1 varchar(255),
-  v2 varchar(255),
-  v3 varchar(255),
-  v4 varchar(255),
-  v5 varchar(255),
-  created_at timestamptz,
-  updated_at timestamptz
-);
-
-create type vehicle_type as enum ('car', 'motorcycle');
-
-create table vehicles (
-  id uuid primary key default uuid_generate_v4(),
-  name varchar(150) not null,
-  license_number varchar(20) not null,
-  max_size int not null check (max_size > 0),
-  type vehicle_type not null,
-  created_at timestamptz,
-  updated_at timestamptz
-);
-
-create table drivers (
+create table sessions (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references users(id) on delete cascade,
-  vehicle_id uuid not null references vehicles(id) on delete set null,
-  name varchar(255) not null,
-  phone_number varchar(15) not null,
-  address text not null,
-  profile_picture_url text,
-  created_at timestamptz,
-  updated_at timestamptz
-);
-
-create table customers (
-  id uuid primary key default uuid_generate_v4(),
-  user_id uuid not null references users(id) on delete cascade,
-  name varchar(255) not null,
-  phone_number varchar(15) not null,
-  profile_picture_url text,
-  created_at timestamptz,
-  updated_at timestamptz
-);
-
-create table saved_addresses (
-  id uuid primary key default uuid_generate_v4(),
-  customer_id uuid not null references customers(id) on delete cascade,
-  name varchar(255) not null,
-  lat_long varchar(40)[] not null,
-  is_default_pickup boolean not null default false,
-  created_at timestamptz,
-  updated_at timestamptz
-);
-
-create type transaction_status as enum ('pending', 'on_the_way', 'completed', 'cancelled');
-
-create table transactions (
-  id uuid primary key default uuid_generate_v4(),
-  customer_id uuid not null references customers(id) on delete set null,
-  driver_id uuid not null references drivers(id) on delete set null,
-  vehicle_id uuid not null references vehicles(id) on delete set null,
-  pickup_lat_long varchar(40)[] not null,
-  destination_lat_long varchar(40)[] not null,
-  last_lat_long varchar(40)[] not null,
-  distance int not null check (distance > 0),
-  fare_per_distance int not null,
-  platform_percentage int not null,
-  total_fare int not null,
-  status transaction_status not null,
-  created_at timestamptz,
-  updated_at timestamptz
-);
-
-create type payout_status as enum ('pending', 'processing', 'cancelled', 'paid', 'failed');
-
-create table payouts (
-  id uuid primary key default uuid_generate_v4(),
-  driver_id uuid not null references drivers(id) on delete cascade,
-  amount int not null,
-  status payout_status not null,
-  failed_reason text,
+  refresh_token_hash varchar(64) unique not null,
+  expires_at timestamptz not null,
+  revoked_at timestamptz,
+  user_agent varchar(512),
+  ip varchar(64),
   created_at timestamptz,
   updated_at timestamptz
 );
 ```
 
-Passwords are bcrypt-hashed in `User.BeforeCreate` and again in register (service hashes before insert). Coordinates are `varchar(40)[]` pairs, not PostGIS.
+Passwords are bcrypt-hashed in `User.BeforeCreate`. Register hashes again before insert. Both paths still work. The double hash is wasteful, not required.
 
-Batch migrations are recorded in a `migrations` table (`name`, `batch`). From a service directory:
+Batch migrations land in a `migrations` table (`name`, `batch`). From a service directory:
 
 ```
 make migrate          # --migrate:run
@@ -427,9 +404,12 @@ make migrate-rollback
 | `JWT_KID` | auth | Optional key id |
 | `AUTH_SERVICE_URL` | gateway | Auth upstream |
 | `TRIP_SERVICE_URL` | gateway | Trip upstream |
-| `AUTH_JWKS_URL` | trip | Full JWKS URL (typically `http://<auth>/.well-known/jwks.json`) |
+| `AUTH_JWKS_URL` | trip | Full JWKS URL, usually `http://<auth>/.well-known/jwks.json` |
 | `REDIS_ADDR` | trip | Redis host:port (default `localhost:6379`) |
 | `REDIS_PASSWORD` | trip | Optional Redis password |
 | `REDIS_DB` | trip | Redis logical DB (default `0`) |
+| `UPLOADTHING_TOKEN` | auth | Profile image uploads |
+| `EXPO_PUBLIC_API_URL` | both apps | Gateway HTTP origin |
+| `EXPO_PUBLIC_WS_URL` | both apps | Gateway WS origin (`ws://` or `wss://`) |
 
-Each service loads `.env` via `godotenv`. Dockerfiles under `backend/<service>/docker` run Air for development; there is no repo-root compose file yet.
+Each service loads `.env` via `godotenv`. Dockerfiles under `backend/<service>/docker` run Air. There is no repo-root compose file.

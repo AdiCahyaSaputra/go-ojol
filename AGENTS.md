@@ -1,0 +1,1 @@
+I know you don't need it bro, you literally know everything in my codebase. In AI we trust 🔥

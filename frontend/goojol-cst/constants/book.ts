@@ -4,6 +4,8 @@ export const DEFAULT_PICKUP = {
   lng: '106.8456',
 } as const;
 
+export const LOCATION_HEARTBEAT_MS = 10_000;
+
 export const VEHICLE_OPTIONS = [
   {
     id: 'fd1dae62-002f-4a1b-9c5b-ea74f54b7168',

@@ -1,10 +1,12 @@
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
+import { ActiveTripRecovery } from '@/feature/book/active-trip-recovery';
 import { BookProvider } from '@/feature/book/book-context';
 
 const ProtectedLayout = () => {
   return (
     <BookProvider>
+      <ActiveTripRecovery />
       <View className="flex-1">
         <Stack
           screenOptions={{

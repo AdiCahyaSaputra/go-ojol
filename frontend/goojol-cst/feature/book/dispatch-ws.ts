@@ -14,12 +14,33 @@ export type DispatchTransactionEvent = {
   transactionId: string;
 };
 
+export type TripLocationEvent = {
+  transactionId: string;
+  lat: number;
+  lng: number;
+};
+
+export type TripStatusEvent = {
+  transactionId: string;
+  status: string;
+};
+
+export type TripCompletedEvent = {
+  transactionId: string;
+  status: string;
+  totalFare: number;
+  paidAt: string;
+};
+
 type DispatchWsHandlers = {
   onWaiting?: (event: DispatchWaitingEvent) => void;
   onDriverMatched?: (event: DispatchMatchedEvent) => void;
   onOfferExpired?: (event: DispatchTransactionEvent) => void;
   onOfferRejected?: (event: DispatchTransactionEvent) => void;
   onNoDrivers?: () => void;
+  onDriverLocation?: (event: TripLocationEvent) => void;
+  onTripStatus?: (event: TripStatusEvent) => void;
+  onTripCompleted?: (event: TripCompletedEvent) => void;
   onError?: (message: string) => void;
   onClose?: () => void;
 };
@@ -29,6 +50,11 @@ type ServerMessage = {
   message?: string;
   transaction_id?: string;
   expires_in_sec?: number;
+  lat?: number;
+  lng?: number;
+  status?: string;
+  total_fare?: number;
+  paid_at?: string;
   matched_driver?: MatchedDriver;
 };
 
@@ -43,9 +69,7 @@ export class CustomerDispatchSocket {
     const wsUrl = process.env.EXPO_PUBLIC_WS_URL ?? '';
     const url = `${wsUrl}/api/trip/dispatch/customer/ws`;
 
-    // NOTES: workaround as we can't send Authorization header in websocket connection
-    // https://github.com/kubernetes/kubernetes/commit/714f97d7baf4975ad3aa47735a868a81a984d1f0#diff-43f0e0ab1c89ddde1a59685bcdbe8403d5db98da2c5b7de7ad5191e2e8665e3aR15-R34
-    const socket = new WebSocket(url, [accessToken]); // Sec-WebSocket-Protocol
+    const socket = new WebSocket(url, [accessToken]);
     this.socket = socket;
 
     socket.onmessage = (event) => {
@@ -81,6 +105,27 @@ export class CustomerDispatchSocket {
           case 'no_drivers':
             handlers.onNoDrivers?.();
             return;
+          case 'driver_location':
+            handlers.onDriverLocation?.({
+              transactionId: message.transaction_id ?? '',
+              lat: message.lat ?? 0,
+              lng: message.lng ?? 0,
+            });
+            return;
+          case 'trip_status':
+            handlers.onTripStatus?.({
+              transactionId: message.transaction_id ?? '',
+              status: message.status ?? '',
+            });
+            return;
+          case 'trip_completed':
+            handlers.onTripCompleted?.({
+              transactionId: message.transaction_id ?? '',
+              status: message.status ?? 'completed',
+              totalFare: message.total_fare ?? 0,
+              paidAt: message.paid_at ?? '',
+            });
+            return;
           case 'error':
             handlers.onError?.(message.message ?? 'WebSocket error');
             return;
@@ -111,6 +156,21 @@ export class CustomerDispatchSocket {
       return false;
     }
     this.socket.send(JSON.stringify({ type: 'retry' }));
+    return true;
+  }
+
+  sendTripLocation(transactionId: string, coords: { lat: number; lng: number }) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+    this.socket.send(
+      JSON.stringify({
+        type: 'trip_location',
+        transaction_id: transactionId,
+        lat: coords.lat,
+        lng: coords.lng,
+      }),
+    );
     return true;
   }
 

@@ -4,7 +4,7 @@ import type { BookLocation, CalculateArgoResponse, MatchedDriver } from './dispa
 
 type VehicleType = 'car' | 'motorcycle';
 
-type BookContextValue = {
+export type BookContextValue = {
   pickup: BookLocation;
   destination: BookLocation | null;
   vehicleType: VehicleType;

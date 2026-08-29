@@ -141,7 +141,7 @@ export default function BookFindDriverScreen() {
           setMatchedDriver(event.matchedDriver);
           setTransactionId(event.transactionId || null);
           socket.disconnect();
-          router.replace('/book/success');
+          router.replace('/book/trip');
         },
         onOfferExpired: () => {
           if (cancelled) {
@@ -209,6 +209,7 @@ export default function BookFindDriverScreen() {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
+
     // Intentionally run once on mount for this booking attempt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

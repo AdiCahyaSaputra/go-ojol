@@ -1,0 +1,50 @@
+###
+# Trip lifecycle — run after driver accepts offer from 03-find-nearby-driver.http
+# Driver token: login as driver first, store as driver_bearer_token
+# Customer token: use bearer_token from customer login
+
+###
+POST {{base_url}}/api/auth/login HTTP/2.0
+Content-Type: application/json
+Accept: application/json
+
+{
+	"email": "drv.adics@gmail.com",
+	"password": "hehe1234"
+}
+
+> {%
+  const data = response.body.data;
+  client.global.set("driver_bearer_token", data.access_token);
+%}
+
+###
+GET {{base_url}}/api/trip/transactions/active HTTP/2.0
+Accept: application/json
+Authorization: Bearer {{driver_bearer_token}}
+
+###
+GET {{base_url}}/api/trip/transactions/active HTTP/2.0
+Accept: application/json
+Authorization: Bearer {{bearer_token}}
+
+###
+# Replace with transaction id from accepted offer
+POST {{base_url}}/api/trip/transactions/{{transaction_id}}/start HTTP/2.0
+Accept: application/json
+Authorization: Bearer {{driver_bearer_token}}
+
+###
+POST {{base_url}}/api/trip/transactions/{{transaction_id}}/complete HTTP/2.0
+Accept: application/json
+Authorization: Bearer {{driver_bearer_token}}
+
+###
+GET {{base_url}}/api/trip/transactions/active HTTP/2.0
+Accept: application/json
+Authorization: Bearer {{bearer_token}}
+
+###
+POST {{base_url}}/api/trip/transactions/{{transaction_id}}/cancel HTTP/2.0
+Accept: application/json
+Authorization: Bearer {{bearer_token}}

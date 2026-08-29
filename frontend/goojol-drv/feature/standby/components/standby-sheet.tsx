@@ -18,6 +18,7 @@ export function StandbySheet() {
     phase,
     coords,
     offer,
+    customerLocation,
     offerSecondsLeft,
     isBusy,
     error,
@@ -25,6 +26,7 @@ export function StandbySheet() {
     goOffline,
     acceptOffer,
     rejectOffer,
+    startTrip,
     completeTrip,
   } = useStandby();
 
@@ -151,7 +153,7 @@ export function StandbySheet() {
             <VStack space="xs">
               <Text className="font-semibold text-lg text-white">Head to pickup</Text>
               <Text className="text-goojol-muted text-sm">
-                Navigate to the pickup point. Complete when ready.
+                Navigate to the pickup point, then start the trip when the passenger is onboard.
               </Text>
             </VStack>
             <HStack className="items-start justify-between gap-3">
@@ -168,12 +170,58 @@ export function StandbySheet() {
                 </Text>
               </VStack>
             </HStack>
+            {customerLocation ? (
+              <Text className="text-goojol-muted text-xs">
+                Passenger at {customerLocation.lat.toFixed(5)}, {customerLocation.lng.toFixed(5)}
+              </Text>
+            ) : null}
+            <Button
+              className="w-full bg-goojol-coral data-[active=true]:bg-goojol-coral/90"
+              onPress={startTrip}
+              isDisabled={isBusy}
+              accessibilityLabel="Start trip"
+            >
+              {isBusy ? <ButtonSpinner /> : null}
+              <ButtonText className="font-semibold text-white">Start trip</ButtonText>
+            </Button>
+          </>
+        )}
+
+        {phase === 'in_trip' && offer && (
+          <>
+            <VStack space="xs">
+              <Text className="font-semibold text-lg text-white">On the way</Text>
+              <Text className="text-goojol-muted text-sm">
+                Head to the destination. Complete the trip when you arrive.
+              </Text>
+            </VStack>
+            <HStack className="items-start justify-between gap-3">
+              <VStack className="min-w-0 flex-1">
+                <Text className="text-goojol-muted text-xs">Drop-off</Text>
+                <Text className="text-base text-white" numberOfLines={2}>
+                  {formatOfferCoord(offer.destination)}
+                </Text>
+              </VStack>
+              <VStack className="min-w-0 flex-1 items-end">
+                <Text className="text-goojol-muted text-xs">Fare</Text>
+                <Text className="font-bold text-base text-goojol-teal">
+                  {formatRupiah(offer.totalFare)}
+                </Text>
+              </VStack>
+            </HStack>
+            {customerLocation ? (
+              <Text className="text-goojol-muted text-xs">
+                Passenger at {customerLocation.lat.toFixed(5)}, {customerLocation.lng.toFixed(5)}
+              </Text>
+            ) : null}
             <Button
               className="w-full bg-goojol-coral data-[active=true]:bg-goojol-coral/90"
               onPress={completeTrip}
+              isDisabled={isBusy}
               accessibilityLabel="Complete trip"
             >
-              <ButtonText className="font-semibold text-white">Complete</ButtonText>
+              {isBusy ? <ButtonSpinner /> : null}
+              <ButtonText className="font-semibold text-white">Complete trip</ButtonText>
             </Button>
           </>
         )}

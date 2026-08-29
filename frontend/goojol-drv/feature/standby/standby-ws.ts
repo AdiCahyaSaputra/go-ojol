@@ -23,11 +23,32 @@ type TripOfferPayload = {
   expires_in_sec?: number;
 };
 
+export type TripLocationEvent = {
+  transactionId: string;
+  lat: number;
+  lng: number;
+};
+
+export type TripStatusEvent = {
+  transactionId: string;
+  status: string;
+};
+
+export type TripCompletedEvent = {
+  transactionId: string;
+  status: string;
+  totalFare: number;
+  paidAt: string;
+};
+
 type StandbyWsHandlers = {
   onStandbyOk?: () => void;
   onTripOffer?: (offer: TripOffer) => void;
   onOfferTaken?: (transactionId: string) => void;
   onOfferExpired?: (transactionId: string) => void;
+  onCustomerLocation?: (event: TripLocationEvent) => void;
+  onTripStatus?: (event: TripStatusEvent) => void;
+  onTripCompleted?: (event: TripCompletedEvent) => void;
   onError?: (message: string) => void;
   onClose?: () => void;
 };
@@ -43,9 +64,7 @@ export class StandbySocket {
     const wsUrl = process.env.EXPO_PUBLIC_WS_URL ?? '';
     const url = `${wsUrl}/api/trip/dispatch/ws`;
 
-    // NOTES: workaround as we can't send Authorization header in websocket connection
-    // https://github.com/kubernetes/kubernetes/commit/714f97d7baf4975ad3aa47735a868a81a984d1f0#diff-43f0e0ab1c89ddde1a59685bcdbe8403d5db98da2c5b7de7ad5191e2e8665e3aR15-R34
-    const socket = new WebSocket(url, [accessToken]); // Sec-WebSocket-Protocol
+    const socket = new WebSocket(url, [accessToken]);
     this.socket = socket;
 
     socket.onmessage = (event) => {
@@ -54,6 +73,11 @@ export class StandbySocket {
           type?: string;
           message?: string;
           transaction_id?: string;
+          lat?: number;
+          lng?: number;
+          status?: string;
+          total_fare?: number;
+          paid_at?: string;
           offer?: TripOfferPayload;
         };
 
@@ -88,6 +112,33 @@ export class StandbySocket {
 
         if (message.type === 'offer_expired') {
           handlers.onOfferExpired?.(message.transaction_id ?? '');
+          return;
+        }
+
+        if (message.type === 'customer_location') {
+          handlers.onCustomerLocation?.({
+            transactionId: message.transaction_id ?? '',
+            lat: message.lat ?? 0,
+            lng: message.lng ?? 0,
+          });
+          return;
+        }
+
+        if (message.type === 'trip_status') {
+          handlers.onTripStatus?.({
+            transactionId: message.transaction_id ?? '',
+            status: message.status ?? '',
+          });
+          return;
+        }
+
+        if (message.type === 'trip_completed') {
+          handlers.onTripCompleted?.({
+            transactionId: message.transaction_id ?? '',
+            status: message.status ?? 'completed',
+            totalFare: message.total_fare ?? 0,
+            paidAt: message.paid_at ?? '',
+          });
           return;
         }
 
@@ -127,6 +178,15 @@ export class StandbySocket {
 
   sendLocation(coords: StandbyCoords) {
     return this.send({ type: 'location', lat: coords.lat, lng: coords.lng });
+  }
+
+  sendTripLocation(transactionId: string, coords: StandbyCoords) {
+    return this.send({
+      type: 'trip_location',
+      transaction_id: transactionId,
+      lat: coords.lat,
+      lng: coords.lng,
+    });
   }
 
   whenOpen(callback: () => void) {

@@ -220,3 +220,7 @@ make module name=<feature>
 ```
 
 Trip also has `make test-dispatch` and `make test-trip`.
+
+# Credit
+- [Caknoooo/go-gin-clean-starter](https://github.com/Caknoooo/go-gin-clean-starter)
+- [Kenney's Pixel Vehicle Pack](https://kenney.nl/assets/pixel-vehicle-pack)

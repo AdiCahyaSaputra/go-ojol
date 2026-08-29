@@ -7,6 +7,7 @@ import (
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/dispatchws/dto"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/drivergeo"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -20,10 +21,16 @@ type OfferRetrier interface {
 	RetryFindDriver(ctx context.Context, customerUserID string) error
 }
 
+type TripLocationHandler interface {
+	HandleDriverTripLocation(ctx context.Context, driverUserID string, transactionID uuid.UUID, lat, lng float64) error
+	HandleCustomerTripLocation(ctx context.Context, customerUserID string, transactionID uuid.UUID, lat, lng float64) error
+}
+
 type DispatchWSService interface {
 	HandleConn(userID string, conn *websocket.Conn)
 	HandleCustomerConn(userID string, conn *websocket.Conn)
 	SetOfferRetrier(retrier OfferRetrier)
+	SetTripLocationHandler(handler TripLocationHandler)
 	Notify(userID string, msg dto.ServerMessage) bool
 	NotifyMany(userIDs []string, msg dto.ServerMessage)
 }
@@ -36,6 +43,7 @@ type wsConnection struct {
 type dispatchWSService struct {
 	locations           *drivergeo.Store
 	retrier             OfferRetrier
+	tripHandler         TripLocationHandler
 	mutex               sync.Mutex
 	driverConnections   map[string]*wsConnection
 	customerConnections map[string]*wsConnection
@@ -53,6 +61,12 @@ func (s *dispatchWSService) SetOfferRetrier(retrier OfferRetrier) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.retrier = retrier
+}
+
+func (s *dispatchWSService) SetTripLocationHandler(handler TripLocationHandler) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.tripHandler = handler
 }
 
 func (s *dispatchWSService) Notify(userID string, msg dto.ServerMessage) bool {
@@ -118,6 +132,8 @@ func (s *dispatchWSService) HandleConn(userID string, conn *websocket.Conn) {
 				if msg.Type == dto.TypeStandby {
 					_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeStandbyOK})
 				}
+			case dto.TypeTripLocation:
+				s.handleDriverTripLocation(connection, userID, msg)
 			default:
 				_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_UNKNOWN_MESSAGE_TYPE})
 			}
@@ -155,11 +171,57 @@ func (s *dispatchWSService) HandleCustomerConn(userID string, conn *websocket.Co
 				if err := retrier.RetryFindDriver(context.Background(), userID); err != nil {
 					_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: err.Error()})
 				}
+			case dto.TypeTripLocation:
+				s.handleCustomerTripLocation(connection, userID, msg)
 			default:
 				_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_UNKNOWN_MESSAGE_TYPE})
 			}
 		}
 	})
+}
+
+func (s *dispatchWSService) handleDriverTripLocation(connection *wsConnection, userID string, msg dto.ClientMessage) {
+	if !validLatLng(msg.Lat, msg.Lng) {
+		_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_INVALID_LAT_LONG})
+		return
+	}
+	txID, err := uuid.Parse(msg.TransactionID)
+	if err != nil {
+		_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_INVALID_TRANSACTION_ID})
+		return
+	}
+	s.mutex.Lock()
+	handler := s.tripHandler
+	s.mutex.Unlock()
+	if handler == nil {
+		_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_TRIP_HANDLER_UNAVAILABLE})
+		return
+	}
+	if err := handler.HandleDriverTripLocation(context.Background(), userID, txID, msg.Lat, msg.Lng); err != nil {
+		_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: err.Error()})
+	}
+}
+
+func (s *dispatchWSService) handleCustomerTripLocation(connection *wsConnection, userID string, msg dto.ClientMessage) {
+	if !validLatLng(msg.Lat, msg.Lng) {
+		_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_INVALID_LAT_LONG})
+		return
+	}
+	txID, err := uuid.Parse(msg.TransactionID)
+	if err != nil {
+		_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_INVALID_TRANSACTION_ID})
+		return
+	}
+	s.mutex.Lock()
+	handler := s.tripHandler
+	s.mutex.Unlock()
+	if handler == nil {
+		_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: dto.MESSAGE_TRIP_HANDLER_UNAVAILABLE})
+		return
+	}
+	if err := handler.HandleCustomerTripLocation(context.Background(), userID, txID, msg.Lat, msg.Lng); err != nil {
+		_ = s.writeJSON(connection, dto.ServerMessage{Type: dto.TypeError, Message: err.Error()})
+	}
 }
 
 func (s *dispatchWSService) runPingLoop(conn *websocket.Conn, connection *wsConnection, readLoop func()) {

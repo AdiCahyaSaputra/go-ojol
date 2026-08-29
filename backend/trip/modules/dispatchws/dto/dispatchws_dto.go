@@ -3,17 +3,22 @@ package dto
 const (
 	TypeStandby      = "standby"
 	TypeLocation     = "location"
+	TypeTripLocation = "trip_location"
 	TypeStandbyOK    = "standby_ok"
 	TypeError        = "error"
 	TypeTripOffer    = "trip_offer"
 	TypeOfferTaken   = "offer_taken"
 	TypeOfferExpired = "offer_expired"
 
-	TypeWaiting        = "waiting"
-	TypeDriverMatched  = "driver_matched"
-	TypeOfferRejected  = "offer_rejected"
-	TypeNoDrivers      = "no_drivers"
-	TypeRetry          = "retry"
+	TypeWaiting          = "waiting"
+	TypeDriverMatched    = "driver_matched"
+	TypeOfferRejected    = "offer_rejected"
+	TypeNoDrivers        = "no_drivers"
+	TypeRetry            = "retry"
+	TypeDriverLocation   = "driver_location"
+	TypeCustomerLocation = "customer_location"
+	TypeTripStatus       = "trip_status"
+	TypeTripCompleted    = "trip_completed"
 )
 
 const (
@@ -22,12 +27,15 @@ const (
 	MESSAGE_FAILED_SAVE_LOC            = "failed to save location"
 	MESSAGE_UNKNOWN_MESSAGE_TYPE       = "unknown message type"
 	MESSAGE_RETRY_UNAVAILABLE          = "retry unavailable"
+	MESSAGE_INVALID_TRANSACTION_ID     = "invalid transaction id"
+	MESSAGE_TRIP_HANDLER_UNAVAILABLE   = "trip handler unavailable"
 )
 
 type ClientMessage struct {
-	Type string  `json:"type"`
-	Lat  float64 `json:"lat"`
-	Lng  float64 `json:"lng"`
+	Type          string  `json:"type"`
+	Lat           float64 `json:"lat"`
+	Lng           float64 `json:"lng"`
+	TransactionID string  `json:"transaction_id,omitempty"`
 }
 
 type TripOfferPayload struct {
@@ -56,6 +64,11 @@ type ServerMessage struct {
 	Message       string                `json:"message,omitempty"`
 	TransactionID string                `json:"transaction_id,omitempty"`
 	ExpiresInSec  int                   `json:"expires_in_sec,omitempty"`
+	Lat           float64               `json:"lat,omitempty"`
+	Lng           float64               `json:"lng,omitempty"`
+	Status        string                `json:"status,omitempty"`
+	TotalFare     int                   `json:"total_fare,omitempty"`
+	PaidAt        string                `json:"paid_at,omitempty"`
 	Offer         *TripOfferPayload     `json:"offer,omitempty"`
 	MatchedDriver *MatchedDriverPayload `json:"matched_driver,omitempty"`
 }

@@ -97,15 +97,16 @@ func (r *dispatchRepository) NearbyDriverProfiles(driverUserIds []uuid.UUID, veh
 
 func (r *dispatchRepository) CreateOfferedTransaction(req dto.CreateOfferedTransaction) (*entities.Transaction, error) {
 	data := entities.Transaction{
-		CustomerID:         &req.CustomerID,
-		PickupLatLong:      req.PickupLatLong[:],
-		LastLatLong:        req.LastLatLong[:],
-		DestinationLatLong: req.DestinationLatLong[:],
-		Distance:           req.Distance,
-		FarePerDistance:    req.FarePerDistance,
-		PlatformPercentage: req.PlatformPercentage,
-		TotalFare:          req.TotalFare,
-		Status:             entities.TransactionStatusOffered,
+		CustomerID:          &req.CustomerID,
+		PickupLatLong:       req.PickupLatLong[:],
+		DriverLastLatLong:   req.DriverLastLatLong[:],
+		CustomerLastLatLong: req.PickupLatLong[:],
+		DestinationLatLong:  req.DestinationLatLong[:],
+		Distance:            req.Distance,
+		FarePerDistance:     req.FarePerDistance,
+		PlatformPercentage:  req.PlatformPercentage,
+		TotalFare:           req.TotalFare,
+		Status:              entities.TransactionStatusOffered,
 	}
 
 	if err := r.db.Create(&data).Error; err != nil {
@@ -119,9 +120,10 @@ func (r *dispatchRepository) ClaimOffer(txID, driverID, vehicleID uuid.UUID) (bo
 	result := r.db.Model(&entities.Transaction{}).
 		Where("id = ? AND status = ?", txID, entities.TransactionStatusOffered).
 		Updates(map[string]any{
-			"status":     entities.TransactionStatusAcceptedOffer,
-			"driver_id":  driverID,
-			"vehicle_id": vehicleID,
+			"status":                 entities.TransactionStatusAcceptedOffer,
+			"driver_id":              driverID,
+			"vehicle_id":             vehicleID,
+			"customer_last_lat_long": gorm.Expr("pickup_lat_long"),
 		})
 	if result.Error != nil {
 		return false, result.Error

@@ -1,6 +1,8 @@
 package entities
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
@@ -29,15 +31,17 @@ type Transaction struct {
 	VehicleID  *uuid.UUID `gorm:"type:uuid" json:"vehicle_id"`
 	Vehicle    *Vehicle   `gorm:"foreignKey:VehicleID;references:ID;constraint:OnDelete:SET NULL" json:"vehicle"`
 
-	PickupLatLong      pq.StringArray `gorm:"type:varchar(40)[];not null" json:"pickup_lat_long"`
-	DestinationLatLong pq.StringArray `gorm:"type:varchar(40)[];not null" json:"destination_lat_long"`
-	LastLatLong        pq.StringArray `gorm:"type:varchar(40)[];not null" json:"last_lat_long"`
+	PickupLatLong        pq.StringArray `gorm:"type:varchar(40)[];not null" json:"pickup_lat_long"`
+	DestinationLatLong   pq.StringArray `gorm:"type:varchar(40)[];not null" json:"destination_lat_long"`
+	DriverLastLatLong    pq.StringArray `gorm:"type:varchar(40)[];not null" json:"driver_last_lat_long"`
+	CustomerLastLatLong  pq.StringArray `gorm:"type:varchar(40)[]" json:"customer_last_lat_long"`
 
 	Distance           int               `gorm:"type:int;check:distance > 0;not null" json:"distance"`
 	FarePerDistance    int               `gorm:"type:int;not null" json:"fare_per_distance"`
 	PlatformPercentage int               `gorm:"type:int;not null" json:"platform_percentage"`
 	TotalFare          int               `gorm:"type:int;not null" json:"total_fare"`
 	Status             TransactionStatus `gorm:"type:transaction_status;not null" json:"status"`
+	PaidAt             *time.Time        `gorm:"type:timestamptz" json:"paid_at"`
 
 	Timestamp
 }

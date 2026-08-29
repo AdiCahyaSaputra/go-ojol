@@ -294,7 +294,7 @@ func (s *dispatchService) startOffer(ctx context.Context, customer entities.Cust
 		CustomerID:         customer.ID,
 		PickupLatLong:      req.PickupLatLong,
 		DestinationLatLong: req.DestinationLatLong,
-		LastLatLong:        req.PickupLatLong,
+		DriverLastLatLong:  req.PickupLatLong,
 		Distance:           distance,
 		FarePerDistance:    farePerDistance,
 		PlatformPercentage: platformPct,

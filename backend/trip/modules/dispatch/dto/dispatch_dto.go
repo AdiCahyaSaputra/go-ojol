@@ -114,7 +114,7 @@ type (
 
 		PickupLatLong      [2]string
 		DestinationLatLong [2]string
-		LastLatLong        [2]string
+		DriverLastLatLong  [2]string
 
 		Distance           int
 		FarePerDistance    int

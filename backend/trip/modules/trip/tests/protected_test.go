@@ -13,11 +13,13 @@ import (
 
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/middlewares"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/controller"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/service"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/session"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/samber/do"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -134,12 +136,14 @@ func newProtectedRouterWithSessions(t *testing.T, allow bool, sessions session.C
 	t.Cleanup(jwksServer.Close)
 
 	verifier := jwks.NewVerifier(jwksServer.URL, "go-ojol-auth")
+	injector := do.New()
+	tripCtrl := controller.NewTripController(injector, service.NewTripService(nil, nil, nil))
 	router := gin.New()
 	router.GET(
 		"/api/trip/protected",
 		middlewares.Authenticate(verifier, sessions),
 		middlewares.Authorize(&stubEnforcer{allow: allow}, "", constants.ENUM_RESOURCE_TRIP, constants.ENUM_ACTION_READ),
-		controller.NewTripController().Protected,
+		tripCtrl.Protected,
 	)
 
 	sign := func(userID, email, role string) string {

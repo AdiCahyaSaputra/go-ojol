@@ -14,11 +14,14 @@ import (
 	savedAddressRepository "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/saved_address/repository"
 	savedAddressService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/saved_address/service"
 	tripController "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/controller"
+	tripRepository "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/repository"
+	tripService "github.com/AdiCahyaSaputra/go-ojol/backend/trip/modules/trip/service"
 	pkgcasbin "github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/casbin"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/constants"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/drivergeo"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/jwks"
 	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/session"
+	"github.com/AdiCahyaSaputra/go-ojol/backend/trip/pkg/triploc"
 	"github.com/redis/go-redis/v9"
 	"github.com/samber/do"
 	"gorm.io/gorm"
@@ -54,13 +57,10 @@ func RegisterDependencies(injector *do.Injector) {
 		return pkgcasbin.NewEnforcer(db)
 	})
 
-	do.Provide(injector, func(i *do.Injector) (tripController.TripController, error) {
-		return tripController.NewTripController(), nil
-	})
-
 	db := do.MustInvokeNamed[*gorm.DB](injector, constants.DB)
 	rdb := do.MustInvokeNamed[*redis.Client](injector, constants.Redis)
 	locations := drivergeo.NewStore(rdb)
+	tripLocations := triploc.NewStore(rdb)
 
 	wsSvc := dispatchwsService.NewDispatchWSService(locations)
 	do.Provide(injector, func(i *do.Injector) (dispatchwsController.DispatchWSController, error) {
@@ -77,6 +77,14 @@ func RegisterDependencies(injector *do.Injector) {
 		wsSvc,
 	)
 	wsSvc.SetOfferRetrier(dispatchSvc)
+
+	tripRepo := tripRepository.NewTripRepository(db)
+	tripSvc := tripService.NewTripService(tripRepo, tripLocations, wsSvc)
+	wsSvc.SetTripLocationHandler(tripSvc)
+
+	do.Provide(injector, func(i *do.Injector) (tripController.TripController, error) {
+		return tripController.NewTripController(i, tripSvc), nil
+	})
 
 	do.Provide(injector, func(i *do.Injector) (dispatchController.DispatchController, error) {
 		return dispatchController.NewDispatchController(i, dispatchSvc), nil
